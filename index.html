@@ -17,6 +17,8 @@
     <button id="btn-new" title="Next board — a new one, or forward again after going back (N)">Next ▶</button>
     <button id="btn-retry" title="Retry this board">Retry</button>
     <button id="btn-hint" title="Show / hide the solution">Hint</button>
+    <button id="btn-fav" class="star" title="Add this board to favorites (F)">☆</button>
+    <button id="btn-favs" title="Your favorite boards">Favorites</button>
     <button id="btn-settings" title="Settings">⚙ Settings</button>
   </header>
 
@@ -69,6 +71,16 @@
       </details>
     </aside>
   </main>
+
+  <div id="fav-modal" class="modal hidden">
+    <div class="modal-box" role="dialog" aria-label="Favorite boards">
+      <header>
+        <h2>Favorite boards</h2>
+        <button id="fav-close" title="Close (Esc)">✕</button>
+      </header>
+      <div id="fav-list" class="tab fav-list"></div>
+    </div>
+  </div>
 
   <div id="settings-modal" class="modal hidden">
     <div class="modal-box" role="dialog" aria-label="Settings">
@@ -124,6 +136,7 @@
   <script src="js/demo.js"></script>
   <script src="js/guides.js"></script>
   <script src="js/genservice.js"></script>
+  <script src="js/favorites.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/input.js"></script>
   <script src="js/game.js"></script>

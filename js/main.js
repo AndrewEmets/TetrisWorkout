@@ -12,6 +12,15 @@
   const renderer = new TW.Renderer(document.getElementById('canvas'));
   TW.SettingsUI.init(input);
 
+  // Favorites: the F action toggles the current board; the modal plays a saved one.
+  TW.Favorites.load();
+  const gamePress = input.onPress;
+  input.onPress = (a) => {
+    if (a === 'favorite') { if (game.drill) TW.Favorites.toggle(game.drill); }
+    else gamePress(a);
+  };
+  TW.Favorites.onChange(() => { game.changed = true; });
+
   // ---------- Drill selectors ----------
 
   const { SCENARIOS, MAX_SETUP } = TW.Generator;
@@ -74,6 +83,15 @@
 
   const blurAfter = (id, fn) => document.getElementById(id).addEventListener('click', (e) => { fn(); e.currentTarget.blur(); });
   blurAfter('btn-prev', () => game.onPress('prev'));
+  blurAfter('btn-fav', () => input.onPress('favorite'));
+  blurAfter('btn-favs', () => TW.FavoritesUI.show());
+  TW.FavoritesUI.init(input, (d) => {
+    settings.data.drill = { scenario: d.scenario, type: d.type, setup: d.setup };
+    lastDrillKey = game.currentKey(); // switch the selectors without generating a new board
+    fillDrillSelectors();
+    settings.save();
+    game.loadDrill(d);
+  });
   blurAfter('btn-new', () => game.onPress('skip'));
   blurAfter('btn-retry', () => game.onPress('retry'));
   blurAfter('btn-hint', () => game.onPress('hint'));
@@ -107,6 +125,7 @@
       'Hard drop: ' + name('hardDrop') + '   Hold: ' + name('hold'),
       'Rotate: ' + name('rotCCW') + ' / ' + name('rotCW') + ' / 180: ' + name('rot180'),
       'Retry: ' + name('retry') + '   Prev / Next: ' + name('prev') + ' / ' + name('skip') + '   Hint: ' + name('hint'),
+      'Favorite: ' + name('favorite'),
     ].join('\n');
   }
 
@@ -132,6 +151,11 @@
     $('keys-help').textContent = keysHelp();
     $('btn-hint').classList.toggle('active', game.hintVisible);
     $('btn-prev').disabled = !game.hasPrev();
+    const fav = TW.Favorites.has(d);
+    $('btn-fav').textContent = fav ? '★' : '☆';
+    $('btn-fav').classList.toggle('on', fav);
+    $('btn-fav').title = fav ? 'Remove this board from favorites (F)' : 'Add this board to favorites (F)';
+    $('btn-favs').textContent = 'Favorites' + (TW.Favorites.list.length ? ' (' + TW.Favorites.list.length + ')' : '');
     const df = game.demoFrame();
     $('demo-controls').classList.toggle('hidden', !df);
     $('btn-demo').classList.toggle('hidden', !!df);

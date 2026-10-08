@@ -81,6 +81,13 @@
 
     hasPrev() { return this.historyIndex(-1) >= 0; }
 
+    // Plays a specific drill (e.g. a favorite) and keeps it in history.
+    loadDrill(d) {
+      ++this.genToken;
+      this.setDrill(d);
+      if (this.gen.background) this.prefetch();
+    }
+
     // Goes back to the previous board of the same drill.
     prevDrill() {
       const i = this.historyIndex(-1);

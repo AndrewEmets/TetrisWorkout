@@ -20,7 +20,8 @@ Play online at the link above, or open `index.html` locally in a browser.
   The shape is outlined on the board while you build it.
 
 Every board is generated procedurally, and a solver confirms it can be solved before you see it.
-Use **Hint** to see the next placement, or **Watch solution** for an animated walkthrough. The walkthrough explains wall kicks and why a rotation counts as a spin.
+Use **Hint** to see the next placement, or **Watch solution** for an animated walkthrough.
+**◀ Prev** goes back to earlier boards. **☆** saves a board to **Favorites** so you can replay it later; favorites are stored in your browser. The walkthrough explains wall kicks and why a rotation counts as a spin.
 
 ## Mechanics
 
@@ -44,7 +45,7 @@ Under ⚙ Settings you can:
 
 Settings are saved in the browser.
 
-Default keys: ← → move, ↓ soft drop, Space hard drop, Z / X rotate, A 180°, C hold, R retry, B previous board, N next / new board, H hint.
+Default keys: ← → move, ↓ soft drop, Space hard drop, Z / X rotate, A 180°, C hold, R retry, B previous board, N next / new board, H hint, F favorite.
 
 ## Credits
 
