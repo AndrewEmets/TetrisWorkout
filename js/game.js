@@ -20,6 +20,8 @@
       this.drill = null;
       this.gen = new TW.GenService();
       this.pending = null; // { key, promise, drill } — the next drill, generated in the background
+      this.history = []; // drills played so far (most recent last)
+      this.histPos = -1; // index of the current drill in history
       this.genToken = 0;
       this.phase = 'idle';
       this.flash = null;
@@ -68,9 +70,36 @@
       return entry;
     }
 
+    // Index of the nearest history entry for the current drill selection in direction dir (-1 / +1), or -1.
+    historyIndex(dir) {
+      const key = this.currentKey();
+      for (let i = this.histPos + dir; i >= 0 && i < this.history.length; i += dir) {
+        if (this.drillKey(this.history[i]) === key) return i;
+      }
+      return -1;
+    }
+
+    hasPrev() { return this.historyIndex(-1) >= 0; }
+
+    // Goes back to the previous board of the same drill.
+    prevDrill() {
+      const i = this.historyIndex(-1);
+      if (i < 0) return;
+      ++this.genToken;
+      this.histPos = i;
+      this.setDrill(this.history[i], true);
+    }
+
+    // Next board: steps forward through history after going back, otherwise a freshly generated one.
     newDrill() {
       const token = ++this.genToken;
       this.piece = null;
+      const fwd = this.historyIndex(1);
+      if (fwd >= 0) {
+        this.histPos = fwd;
+        this.setDrill(this.history[fwd], true);
+        return;
+      }
       const entry = this.prefetch();
       this.pending = null;
       if (entry.drill !== undefined) { this.useDrill(entry.drill); return; }
@@ -92,8 +121,13 @@
       if (this.gen.background) this.prefetch();
     }
 
-    setDrill(d) {
+    setDrill(d, fromHistory) {
       this.drill = d;
+      if (!fromHistory) {
+        this.history.push(d);
+        if (this.history.length > 100) this.history.shift();
+        this.histPos = this.history.length - 1;
+      }
       // Board before each solution step, used to decide whether the hint still applies.
       const b = d.board.clone();
       d.placements = d.solution.filter((a) => !a.hold);
@@ -384,10 +418,12 @@
         else if (a === 'hardDrop' || a === 'hold') this.demoToggle();
         else if (a === 'retry' || a === 'hint') this.stopDemo();
         else if (a === 'skip') this.newDrill();
+        else if (a === 'prev') this.prevDrill();
         return;
       }
       if (a === 'retry') { if (this.drill && this.phase !== 'generating') this.startAttempt(); return; }
       if (a === 'skip') { this.newDrill(); return; }
+      if (a === 'prev') { this.prevDrill(); return; }
       if (a === 'hint') {
         this.hintVisible = !this.hintVisible;
         this.changed = true;

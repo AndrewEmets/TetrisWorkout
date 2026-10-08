@@ -8,7 +8,7 @@
   const ACTIONS = [
     ['left', 'Move left'], ['right', 'Move right'], ['softDrop', 'Soft drop'], ['hardDrop', 'Hard drop'],
     ['rotCCW', 'Rotate CCW'], ['rotCW', 'Rotate CW'], ['rot180', 'Rotate 180'], ['hold', 'Hold'],
-    ['retry', 'Retry board'], ['skip', 'New board'], ['hint', 'Show hint'],
+    ['retry', 'Retry board'], ['prev', 'Previous board'], ['skip', 'Next / new board'], ['hint', 'Show hint'],
   ];
 
   const DEFAULTS = {
@@ -17,12 +17,12 @@
       keyboard: {
         left: ['ArrowLeft'], right: ['ArrowRight'], softDrop: ['ArrowDown'], hardDrop: ['Space'],
         rotCCW: ['KeyZ', 'ControlLeft'], rotCW: ['KeyX', 'ArrowUp'], rot180: ['KeyA'], hold: ['KeyC', 'ShiftLeft'],
-        retry: ['KeyR'], skip: ['KeyN'], hint: ['KeyH'],
+        retry: ['KeyR'], prev: ['KeyB'], skip: ['KeyN'], hint: ['KeyH'],
       },
       gamepad: {
         left: ['b14', 'a0-'], right: ['b15', 'a0+'], softDrop: ['b13', 'a1+'], hardDrop: ['b12'],
         rotCCW: ['b0'], rotCW: ['b1'], rot180: ['b3'], hold: ['b4', 'b5'],
-        retry: ['b8'], skip: ['b9'], hint: [],
+        retry: ['b8'], prev: [], skip: ['b9'], hint: [],
       },
       deadzone: 0.5,
     },

@@ -32,6 +32,7 @@ button, select, input, textarea {
 
 button { padding: 5px 12px; cursor: pointer; }
 button:hover { border-color: #4a5060; background: #2a2e38; }
+button:disabled { opacity: 0.4; cursor: default; border-color: var(--border); background: var(--panel-2); }
 button.active { border-color: var(--accent); background: #3a2444; }
 button.small { padding: 2px 8px; font-size: 12px; }
 button.danger { color: #ff9a9a; }

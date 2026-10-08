@@ -44,7 +44,7 @@ Under ⚙ Settings you can:
 
 Settings are saved in the browser.
 
-Default keys: ← → move, ↓ soft drop, Space hard drop, Z / X rotate, A 180°, C hold, R retry, N new board, H hint.
+Default keys: ← → move, ↓ soft drop, Space hard drop, Z / X rotate, A 180°, C hold, R retry, B previous board, N next / new board, H hint.
 
 ## Credits
 

@@ -73,6 +73,7 @@
   });
 
   const blurAfter = (id, fn) => document.getElementById(id).addEventListener('click', (e) => { fn(); e.currentTarget.blur(); });
+  blurAfter('btn-prev', () => game.onPress('prev'));
   blurAfter('btn-new', () => game.onPress('skip'));
   blurAfter('btn-retry', () => game.onPress('retry'));
   blurAfter('btn-hint', () => game.onPress('hint'));
@@ -105,7 +106,7 @@
       'Move: ' + name('left') + ' / ' + name('right') + '   Soft: ' + name('softDrop'),
       'Hard drop: ' + name('hardDrop') + '   Hold: ' + name('hold'),
       'Rotate: ' + name('rotCCW') + ' / ' + name('rotCW') + ' / 180: ' + name('rot180'),
-      'Retry: ' + name('retry') + '   New: ' + name('skip') + '   Hint: ' + name('hint'),
+      'Retry: ' + name('retry') + '   Prev / Next: ' + name('prev') + ' / ' + name('skip') + '   Hint: ' + name('hint'),
     ].join('\n');
   }
 
@@ -130,6 +131,7 @@
     $('st-best').textContent = st.best;
     $('keys-help').textContent = keysHelp();
     $('btn-hint').classList.toggle('active', game.hintVisible);
+    $('btn-prev').disabled = !game.hasPrev();
     const df = game.demoFrame();
     $('demo-controls').classList.toggle('hidden', !df);
     $('btn-demo').classList.toggle('hidden', !!df);
