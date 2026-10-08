@@ -21,7 +21,9 @@ Play online at the link above, or open `index.html` locally in a browser.
 
 Every board is generated procedurally, and a solver confirms it can be solved before you see it.
 Use **Hint** to see the next placement, or **Watch solution** for an animated walkthrough.
-**◀ Prev** goes back to earlier boards. **☆** saves a board to **Favorites** so you can replay it later; favorites are stored in your browser. The walkthrough explains wall kicks and why a rotation counts as a spin.
+The walkthrough explains wall kicks and why a rotation counts as a spin.
+
+**◀ Prev** goes back to earlier boards. **☆** saves a board to **Favorites** so you can replay it later; favorites are stored in your browser.
 
 ## Mechanics
 
