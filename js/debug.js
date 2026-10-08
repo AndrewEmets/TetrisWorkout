@@ -61,29 +61,63 @@
     return { ok: true };
   }
 
+  // Spin drills: every setup piece must be needed (no early spin, no hold shortcut). Returns true / false.
+  function setupNeeded(drill) {
+    if (drill.goal.kind !== 'spin') return true;
+    const steps = drill.solution.filter((a) => !a.hold).slice(0, -1);
+    const setups = steps.map((st) => ({ type: st.type, cells: TW.Pieces.cellsOf(st) }));
+    return !!TW.Generator.validateSpin(drill.board, setups, drill.goal);
+  }
+
   // Generates n drills for every scenario/type/setup combination and replays their solutions.
-  function selfTest(n, setups) {
+  // opts.shuffle: chance (%) of queues that need hold, opts.only: scenario keys to test.
+  function selfTest(n, setups, opts) {
     n = n || 3;
     setups = setups || [0, 1, 2, 3];
+    opts = opts || {};
     const report = [];
     for (const [sc, def] of Object.entries(TW.Generator.SCENARIOS)) {
+      if (opts.only && !opts.only.includes(sc)) continue;
       for (const [type] of def.types) {
         for (const setup of sc === 'OP' ? [0] : setups) {
-          let ok = 0, fail = 0, gen = 0, ms = 0;
+          let ok = 0, fail = 0, gen = 0, ms = 0, tpl = 0, held = 0;
           const errors = [];
           for (let i = 0; i < n; i++) {
             const t0 = performance.now();
-            const d = TW.Generator.generate(sc, type, setup);
+            const d = TW.Generator.generate(sc, type, setup, { hold: true, shuffle: opts.shuffle || 0 });
             ms += performance.now() - t0;
             if (!d) { gen++; continue; }
+            if (d.well) tpl++;
+            if (d.needsHold) held++;
             const r = replay(d);
+            if (r.ok && !setupNeeded(d)) { r.ok = false; r.reason = 'setup piece not needed'; }
             if (r.ok) ok++; else { fail++; errors.push(r.reason); }
           }
-          report.push({ scenario: sc, type, setup, ok, fail, genFail: gen, avgMs: Math.round(ms / n), errors: errors.join(' | ') });
+          report.push({ scenario: sc, type, setup, ok, fail, genFail: gen, template: tpl, needsHold: held, avgMs: Math.round(ms / n), errors: errors.join(' | ') });
         }
       }
     }
     return report;
+  }
+
+  // Checks every well template at every setup count: how many random placements work (out of `tries`).
+  function checkWells(tries) {
+    tries = tries || 5;
+    const out = [];
+    for (const t of TW.Wells.all()) {
+      const goal = { kind: 'spin', piece: t.piece, spin: t.spin, lines: t.lines };
+      const row = { id: t.id, piece: t.piece };
+      for (let s = 0; s <= t.setupMax; s++) {
+        let ok = 0;
+        for (let i = 0; i < tries; i++) {
+          const e = TW.Wells.embed(t, s);
+          if (e && TW.Generator.validateSpin(e.board, e.setups, goal, e.target)) ok++;
+        }
+        row['setup' + s] = ok + '/' + tries;
+      }
+      out.push(row);
+    }
+    return out;
   }
 
   // Loads a board from rows (top to bottom, letters/'#' = filled) into the running game, with an optional queue.
@@ -99,7 +133,7 @@
     const s = game.settings.data.drill;
     const lines = [];
     lines.push('Tetris Workout — ' + d.goal.text + (d.setup ? ' (setup ' + d.setup + ')' : ''));
-    lines.push('drill: ' + JSON.stringify({ scenario: d.scenario, type: d.type, setup: d.setup }));
+    lines.push('drill: ' + JSON.stringify({ scenario: d.scenario, type: d.type, setup: d.setup, well: d.well ? d.well.id : undefined, needsHold: d.needsHold || undefined }));
     if (d.opener) lines.push('opener step: ' + (game.op ? game.op.k + 1 : '?') + ' / ' + d.opener.phases.length);
     lines.push('', 'Start board (queue ' + d.queue.join('') + '):');
     lines.push(...d.board.toLetterRows());
@@ -121,5 +155,5 @@
     return lines.join('\n');
   }
 
-  TW.debug = { replay, selfTest, loadBoard, describe };
+  TW.debug = { replay, selfTest, setupNeeded, checkWells, loadBoard, describe };
 })(window.TW);

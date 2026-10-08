@@ -16,6 +16,8 @@
       queue: d.queue.slice(),
       rows: d.board.toLetterRows(),
       solution: d.solution,
+      well: d.well || null,
+      needsHold: !!d.needsHold,
     };
   }
 
@@ -26,6 +28,8 @@
       solution: f.solution,
       goal: f.goal,
       scenario: f.scenario, type: f.type, setup: f.setup,
+      well: f.well || null,
+      needsHold: !!f.needsHold,
       opener: f.scenario === 'OP' ? TW.Openers.OPENERS[f.type] : null,
     };
   }

@@ -163,7 +163,8 @@ TW.module(function (TW) {
   // resting surface placement, reachable from spawn on the board without it, and must not leave floating cells.
   // opts: exclude (types not allowed), distinct (no repeated types: a valid 7-bag window),
   //       near (anchor cells), reach (max distance to the anchor or to an already removed piece),
-  //       radius (max distance to the anchor itself), partial (return what was found), tries.
+  //       radius (max distance to the anchor itself), blocks (predicate the board must pass after the removal),
+  //       partial (return what was found), cosmetic (skip the reachability search), tries.
   function decompose(board, n, keepBelowRow, opts) {
     opts = opts || {};
     let cur = board.clone();
@@ -172,19 +173,7 @@ TW.module(function (TW) {
     const removedCells = [];
     for (let k = 0; k < n; k++) {
       const cands = [];
-      if (opts.pieces) {
-        for (const pc of opts.pieces) {
-          if (used.has(pc.type) || !pc.cells.every(([cx, cy]) => cur.get(cx, cy))) continue;
-          let d = 0;
-          if (opts.near) {
-            d = cellDist(pc.cells, opts.near);
-            if (d > opts.radius) continue;
-            if (Math.min(d, removedCells.length ? cellDist(pc.cells, removedCells) : Infinity) > opts.reach) continue;
-          }
-          cands.push({ ...pc, d });
-        }
-      }
-      for (const type of opts.pieces ? [] : TYPES) {
+      for (const type of TYPES) {
         if (used.has(type)) continue;
         for (let rot = 0; rot < (type === 'O' ? 1 : 4); rot++) {
           for (let x = -3; x < W; x++) {
@@ -217,6 +206,7 @@ TW.module(function (TW) {
           break;
         }
         if (++tries > (opts.tries || 30)) break;
+        if (opts.blocks && !opts.blocks(b2)) continue;
         const res = TW.Search.search(b2, c.type);
         const pl = res.placements.find((p) => p.x === c.x && p.y === c.y && p.rot === c.rot);
         if (!pl) continue;
@@ -251,149 +241,100 @@ TW.module(function (TW) {
     return out;
   }
 
-  // All fixed tetromino orientations, as offsets from their top-left-most cell (scan order: top row first).
-  const ORIENTS = (() => {
-    const seen = new Set();
-    const out = [];
-    for (const type of TYPES) {
-      for (let rot = 0; rot < 4; rot++) {
-        const cells = SHAPES[type][rot];
-        const ax = Math.min(...cells.filter((c) => c[1] === Math.min(...cells.map((d) => d[1]))).map((c) => c[0]));
-        const ay = Math.min(...cells.map((c) => c[1]));
-        const offs = cells.map(([x, y]) => [x - ax, y - ay]).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
-        const key = type + offs.join(';');
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ type, rot, ax, ay, offs });
-      }
-    }
-    return out;
-  })();
-
-  // Covers `region` (cell indices y * W + x) with tetrominoes, leaving at most `skips` cells uncovered
-  // (only cells farther than 1 from `slot`). Same-type pieces never touch. Returns placements or null.
-  function tileRegion(region, limit, skips, slot) {
-    const left = new Set(region);
-    const order = [...region].sort((a, b) => a - b);
-    const out = [];
-    const typeAt = new Map();
-    const touchesSame = (idx, type) => idx.some((j) => {
-      const x = j % W;
-      return (x > 0 && typeAt.get(j - 1) === type) || (x < W - 1 && typeAt.get(j + 1) === type) ||
-        typeAt.get(j - W) === type || typeAt.get(j + W) === type;
-    });
-    let nodes = 0;
-    const orients = shuffle(ORIENTS.slice());
-    function rec(i, skipsLeft) {
-      while (i < order.length && !left.has(order[i])) i++;
-      if (i >= order.length) return true;
-      if (++nodes > limit) return false;
-      const c = order[i], cx = c % W, cy = Math.floor(c / W);
-      for (const o of orients) {
-        const idx = [];
-        let ok = true;
-        for (const [dx, dy] of o.offs) {
-          const x = cx + dx, y = cy + dy;
-          if (x < 0 || x >= W || !left.has(y * W + x)) { ok = false; break; }
-          idx.push(y * W + x);
-        }
-        if (!ok || touchesSame(idx, o.type)) continue;
-        for (const j of idx) { left.delete(j); typeAt.set(j, o.type); }
-        out.push({ type: o.type, rot: o.rot, x: cx - o.ax, y: cy - o.ay, cells: idx.map((j) => [j % W, Math.floor(j / W)]) });
-        if (rec(i + 1, skipsLeft)) return true;
-        out.pop();
-        for (const j of idx) { left.add(j); typeAt.delete(j); }
-      }
-      if (skipsLeft > 0 && cellDist([[cx, cy]], slot) > 1) {
-        left.delete(c);
-        if (rec(i + 1, skipsLeft - 1)) return true;
-        left.add(c);
-      }
-      return false;
-    }
-    return rec(0, skips) ? out : null;
+  // True when the goal piece can make the goal clear on this board right now.
+  function goalPossible(board, goal) {
+    return TW.Search.search(board, goal.piece).placements.some((p) => goalMatches(goal, p.type, p.spin, p.lines));
   }
 
-  // Splits the stack above the garbage into real pieces with as few leftover (gray) cells as possible.
-  function tileStack(board, keepBelowRow, slot) {
-    const region = [];
-    for (let y = 0; y < keepBelowRow; y++) for (let x = 0; x < W; x++) if (board.get(x, y)) region.push(y * W + x);
-    for (let k = region.length % 4; k <= 10; k += 4) {
-      const pieces = tileRegion(region, 3000, k, slot);
-      if (pieces) return pieces;
+  // Checks a spin drill: `setups` ([{ type, cells }], in order) must each be reachable without clearing lines,
+  // the goal must work after the last one, and every setup piece must be needed:
+  //  - no early spin: the goal is impossible before the last setup piece is placed;
+  //  - no shortcut: leaving out any one setup piece (e.g. keeping it in hold) also makes the goal impossible.
+  // Returns { steps, goalStep } with input paths, or null. `target` (optional) is the preferred goal placement.
+  function validateSpin(board, setups, goal, target) {
+    const b = board.clone();
+    const steps = [];
+    if (setups.length && goalPossible(b, goal)) return null;
+    for (let i = 0; i < setups.length; i++) {
+      const s = setups[i];
+      const res = TW.Search.search(b, s.type);
+      const want = s.cells.map((c) => c.join(',')).sort().join(';');
+      const pl = res.placements.find((p) => !p.lines && cellsOf(p).map((c) => c.join(',')).sort().join(';') === want);
+      if (!pl) return null;
+      steps.push({ type: pl.type, rot: pl.rot, x: pl.x, y: pl.y, path: res.pathTo(pl) });
+      b.place(pl);
+      if (i < setups.length - 1 && goalPossible(b, goal)) return null;
     }
-    return greedyTile(region, slot);
+    const res = TW.Search.search(b, goal.piece);
+    const hits = res.placements.filter((p) => goalMatches(goal, p.type, p.spin, p.lines));
+    if (!hits.length) return null;
+    const hit = (target && hits.find((h) => TW.Search.sameCells(h, target))) || hits[0];
+    for (let skip = 0; setups.length > 1 && skip < steps.length - 1; skip++) {
+      const b2 = board.clone();
+      steps.forEach((st, i) => { if (i !== skip) b2.place(st); });
+      if (goalPossible(b2, goal)) return null;
+    }
+    return { steps, goalStep: { type: hit.type, rot: hit.rot, x: hit.x, y: hit.y, path: res.pathTo(hit) } };
   }
 
-  // Fallback: random greedy cover (scan order, first fitting piece), best of several runs by
-  // covered cells, weighting cells near the slot higher.
-  function greedyTile(region, slot) {
-    const order = [...region].sort((a, b) => a - b);
-    let best = null, bestScore = -1;
-    for (let run = 0; run < 24; run++) {
-      const left = new Set(region);
-      const typeAt = new Map();
-      const out = [];
-      let score = 0;
-      const orients = shuffle(ORIENTS.slice());
-      for (const c of order) {
-        if (!left.has(c)) continue;
-        const cx = c % W, cy = Math.floor(c / W);
-        for (const o of orients) {
-          const idx = [];
-          let ok = true;
-          for (const [dx, dy] of o.offs) {
-            const x = cx + dx, y = cy + dy;
-            if (x < 0 || x >= W || !left.has(y * W + x)) { ok = false; break; }
-            idx.push(y * W + x);
-          }
-          if (!ok) continue;
-          const same = idx.some((j) => [j - 1, j + 1, j - W, j + W].some((n) => typeAt.get(n) === o.type && Math.abs((n % W) - (j % W)) <= 1));
-          if (same) continue;
-          for (const j of idx) { left.delete(j); typeAt.set(j, o.type); }
-          const cells = idx.map((j) => [j % W, Math.floor(j / W)]);
-          score += 4 + Math.max(0, 3 - cellDist(cells, slot));
-          out.push({ type: o.type, rot: o.rot, x: cx - o.ax, y: cy - o.ay, cells });
-          break;
-        }
-      }
-      if (score > bestScore) { best = out; bestScore = score; }
+  // Peels setupN setup pieces off a finished well (the goal works on `board`) so that every one is needed.
+  // Returns { board, steps, goalStep } or null.
+  function peelSetup(board, goal, target, setupN) {
+    const slot = cellsOf(target);
+    const keepBelow = Math.max(...slot.map((c) => c[1])) + 1;
+    const opts = {
+      exclude: [goal.piece], distinct: true, near: slot, reach: 1, radius: 2,
+      blocks: (b) => !goalPossible(b, goal),
+    };
+    for (let d = 0; d < 4; d++) {
+      const dec = setupN ? decompose(board, setupN, keepBelow, opts) : { board: board.clone(), steps: [] };
+      if (!dec) continue;
+      const v = validateSpin(dec.board, dec.steps.map((st) => ({ type: st.type, cells: cellsOf(st) })), goal, target);
+      if (v) return { board: dec.board, steps: v.steps, goalStep: v.goalStep };
+      if (!setupN) return null;
     }
-    return best;
+    return null;
   }
 
-  function genSpin(goal, setupN) {
-    for (let attempt = 0; attempt < 20000; attempt++) {
+  // Procedural spin drill: random stack around a target placement, then setup pieces peeled off near the slot.
+  function genSpin(goal, setupN, maxAttempts) {
+    for (let attempt = 0; attempt < (maxAttempts || 20000); attempt++) {
       const cand = buildSpinBoard(goal, setupN);
       if (!cand) continue;
       const res = TW.Search.search(cand.board, goal.piece);
       const hits = res.placements.filter((p) => goalMatches(goal, p.type, p.spin, p.lines));
       if (!hits.length) continue;
       const hit = hits.find((h) => TW.Search.sameCells(h, cand.target)) || hits[0];
-      const goalStep = { type: hit.type, rot: hit.rot, x: hit.x, y: hit.y, path: res.pathTo(hit) };
-      const slot = cellsOf(hit);
-      const keepBelow = Math.max(...cellsOf(cand.target).map((c) => c[1])) + 1;
-      const pieces = tileStack(cand.board, keepBelow, slot);
-
-      // Setup pieces must help build the slot: they touch it, or touch another setup piece close to it.
-      // Prefer pieces from the tiling so the colors match how the stack was built.
-      const setupOpts = { exclude: [goal.piece], distinct: true, near: slot, reach: 1, radius: 2 };
-      let dec = null;
-      for (let d = 0; d < 4 && !dec && pieces; d++) dec = decompose(cand.board, setupN, keepBelow, { ...setupOpts, pieces });
-      for (let d = 0; d < 3 && !dec; d++) dec = decompose(cand.board, setupN, keepBelow, setupOpts);
-      if (!dec) continue;
-      let board = dec.board.clone();
-      if (pieces) {
-        for (const pc of pieces) if (pc.cells.every(([x, y]) => board.get(x, y))) board.place(pc);
-      } else {
-        board = colorize(board, keepBelow, slot);
-      }
+      const out = peelSetup(cand.board, goal, hit, setupN);
+      if (!out) continue;
       return {
-        board,
-        queue: [...dec.steps.map((s) => s.type), goal.piece],
-        solution: [...dec.steps, goalStep],
+        board: out.board,
+        queue: [...out.steps.map((s) => s.type), goal.piece],
+        solution: [...out.steps, out.goalStep],
         attempts: attempt + 1,
-        tiled: !!pieces,
+      };
+    }
+    return null;
+  }
+
+  // Spin drill from the well template library (js/wells.js): a known well, gray filler around it.
+  function genFromTemplate(goal, setupN) {
+    const pool = TW.Wells ? TW.Wells.pool(goal, setupN) : [];
+    if (!pool.length) return null;
+    const total = pool.reduce((sum, t) => sum + t.weight, 0);
+    for (let attempt = 0; attempt < 200; attempt++) {
+      let r = Math.random() * total, t = pool[0];
+      for (const c of pool) { r -= c.weight; if (r < 0) { t = c; break; } }
+      const e = TW.Wells.embed(t, setupN);
+      if (!e) continue;
+      const v = validateSpin(e.board, e.setups, goal, e.target);
+      if (!v) continue;
+      return {
+        board: e.board,
+        queue: [...v.steps.map((s) => s.type), goal.piece],
+        solution: [...v.steps, v.goalStep],
+        attempts: attempt + 1,
+        well: { id: t.id, name: t.name || null },
       };
     }
     return null;
@@ -490,7 +431,95 @@ TW.module(function (TW) {
     return null;
   }
 
+  // ---------- Hold shuffles ----------
+
+  // With one hold slot, can `queue` be played so the pieces are placed in `order`?
+  // Returns, for each placement, whether hold is pressed right before it, or null.
+  function holdPlan(queue, order) {
+    const after = (qi, hold) => (qi < queue.length ? [queue[qi], qi + 1, hold] : [hold, qi, null]);
+    function rec(k, cur, qi, hold) {
+      if (k === order.length) return [];
+      const want = order[k];
+      if (cur === want) {
+        const r = rec(k + 1, ...after(qi, hold));
+        if (r) return [false, ...r];
+      }
+      if (!cur) return null;
+      let next = hold, nq = qi;
+      if (!hold) { if (qi >= queue.length) return null; next = queue[qi]; nq = qi + 1; }
+      if (next === want) {
+        const r = rec(k + 1, ...after(nq, cur));
+        if (r) return [true, ...r];
+      }
+      return null;
+    }
+    return rec(0, queue[0], 1, null);
+  }
+
+  // Is there a perfect clear for `queue` played in order without hold? true / false, or null when the
+  // search budget runs out.
+  function pcWithoutHold(board, queue, height, budget) {
+    let nodes = 0;
+    const failed = new Set();
+    function dfs(b, i) {
+      if (i >= queue.length) return false;
+      const key = i + '|' + b.toRows().join('');
+      if (failed.has(key)) return false;
+      if (++nodes > budget) throw dfs;
+      for (const pl of TW.Search.search(b, queue[i]).placements) {
+        const nb = b.clone();
+        nb.place(pl);
+        nb.clearLines();
+        if (nb.isEmpty()) return true;
+        const h = nb.stackHeight();
+        if (h > height) continue;
+        let filled = 0;
+        for (let y = H - h; y < H; y++) for (let x = 0; x < W; x++) if (nb.get(x, y)) filled++;
+        if (filled + 4 * (queue.length - i - 1) < W * h) continue; // not enough pieces left to fill the stack
+        if (dfs(nb, i + 1)) return true;
+      }
+      failed.add(key);
+      return false;
+    }
+    try { return dfs(board, 0); } catch (e) { if (e === dfs) return null; throw e; }
+  }
+
+  // Reorders the queue so the drill needs hold: the solution's placement order only works by holding.
+  // Spin drills: the goal piece comes early (it can't spin before the setup is done, so it must be held).
+  // Perfect clears: a piece comes early, and a search confirms there is no perfect clear without hold.
+  function holdShuffle(drill, goal) {
+    const steps = drill.solution;
+    const order = steps.map((s) => s.type);
+    let queue = null;
+    if (goal.kind === 'spin') {
+      const n = order.length - 1;
+      if (n < 1) return false;
+      queue = order.slice(0, n);
+      queue.splice(rand(n), 0, goal.piece);
+    } else {
+      for (let t = 0; t < 8 && !queue; t++) {
+        const q = order.slice();
+        const from = randInt(1, q.length - 1), to = rand(from);
+        q.splice(to, 0, q.splice(from, 1)[0]);
+        if (q.join('') === order.join('') || !holdPlan(q, order)) continue;
+        if (pcWithoutHold(drill.board, q, goal.height, 1500) === false) queue = q;
+      }
+      if (!queue) return false;
+    }
+    const plan = holdPlan(queue, order);
+    if (!plan) return false;
+    drill.queue = queue;
+    drill.solution = [];
+    steps.forEach((s, i) => {
+      if (plan[i]) drill.solution.push({ hold: true });
+      drill.solution.push(s);
+    });
+    drill.needsHold = true;
+    return true;
+  }
+
   // Returns a drill { board, queue, solution, goal, scenario, type, setup } or null.
+  // opts: hold (hold allowed), shuffle (chance in % of a queue order that needs hold).
   function generate(scenario, type, setup, opts) {
     if (scenario === 'OP') return TW.Openers.generate(type, !opts || opts.hold !== false);
     const goal = makeGoal(scenario, type);
@@ -499,11 +528,18 @@ TW.module(function (TW) {
       const n = Math.min(setup, MAX_SETUP.pc);
       drill = genPC(goal, 2 + n);
     } else {
-      drill = genSpin(goal, Math.min(setup, MAX_SETUP.spin));
+      const n = Math.min(setup, MAX_SETUP.spin);
+      drill = genFromTemplate(goal, n) || genSpin(goal, n);
     }
     if (!drill) return null;
+    const hold = !opts || opts.hold !== false;
+    if (hold && opts && opts.shuffle > 0 && Math.random() * 100 < opts.shuffle) holdShuffle(drill, goal);
     return Object.assign(drill, { goal, scenario, type, setup });
   }
 
-  TW.Generator = { SCENARIOS, MAX_SETUP, generate, makeGoal, goalMatches };
+  TW.Generator = {
+    SCENARIOS, MAX_SETUP, generate, makeGoal, goalMatches,
+    // Used by js/wells.js, the debug self-test and tools/mine-wells.js.
+    goalPossible, validateSpin, peelSetup, genSpin, buildSpinBoard, removeFloating, holdPlan, pcWithoutHold, holdShuffle,
+  };
 });

@@ -34,7 +34,7 @@
     },
     game: {
       gravity: 0, lockDelay: 30, lockResets: 15,
-      hold: true, ghost: true, showTarget: true, successDelay: 500, failDelay: 800,
+      hold: true, holdShuffle: 30, ghost: true, showTarget: true, successDelay: 500, failDelay: 800,
     },
     drill: { scenario: 'T', type: 'double', setup: 0 },
   };
@@ -57,6 +57,7 @@
       { path: 'game.lockDelay', label: 'Lock delay', hint: 'Only used when gravity is on', min: 1, max: 120, step: 1, unit: 'f' },
       { path: 'game.lockResets', label: 'Lock resets', min: 0, max: 30, step: 1, unit: '' },
       { path: 'game.hold', label: 'Allow hold', type: 'bool' },
+      { path: 'game.holdShuffle', label: 'Queues that need hold', hint: 'Chance that a new board comes with a queue order that only works with hold', min: 0, max: 100, step: 5, unit: '%' },
       { path: 'game.ghost', label: 'Show ghost piece', type: 'bool' },
       { path: 'game.showTarget', label: 'Show opener shape outline', type: 'bool' },
       { path: 'game.successDelay', label: 'Pause after success', min: 0, max: 3000, step: 50, unit: 'ms' },

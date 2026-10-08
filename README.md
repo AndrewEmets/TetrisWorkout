@@ -14,12 +14,16 @@ Play online at the link above, or open `index.html` locally in a browser.
 ## Drills
 
 - **Spins:** T-spin Mini / Single / Double / Triple, plus S, Z, L, J and I spins (single to triple).
-  **Setup pieces** (0–3) make you place pieces next to the slot before the spin, so you practice building the slot too.
+  Boards come from a library of wells: named setups (TSD, TSS, TST, STSD) plus a few hundred mined ones.
+  The well is drawn in color and the rest of the stack in gray.
+  **Setup pieces** (0–3) make you build the last pieces of the well yourself. Every setup piece is needed:
+  the spin isn't possible before the last one is placed, or with any one of them kept in hold.
 - **Perfect clear:** 2-line or 4-line, with 2–8 pieces.
 - **Openers:** TKI, DT Cannon, Hachispin, PCO and MKO. Bag orders are 7-bag sequences checked to be buildable.
   The shape is outlined on the board while you build it.
 
-Every board is generated procedurally, and a solver confirms it can be solved before you see it.
+Every board is checked by a solver before you see it.
+Some queues come in an order that only works with **hold** (set how often under ⚙ Settings → Game).
 Use **Hint** to see the next placement, or **Watch solution** for an animated walkthrough.
 The walkthrough explains wall kicks and why a rotation counts as a spin.
 
@@ -48,6 +52,14 @@ Under ⚙ Settings you can:
 Settings are saved in the browser.
 
 Default keys: ← → move, ↓ soft drop, Space hard drop, Z / X rotate, A 180°, C hold, R retry, B previous board, N next / new board, H hint, F favorite.
+
+## Well library
+
+`js/wells-data.js` is generated. To rebuild it (Node.js):
+
+```
+node tools/mine-wells.js [templates per drill type] [seconds per drill type]
+```
 
 ## Credits
 

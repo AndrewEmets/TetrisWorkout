@@ -10,7 +10,7 @@
       let drill = null, error = null;
       const t0 = performance.now();
       try {
-        drill = TW.Generator.generate(spec.scenario, spec.type, spec.setup, { hold: spec.hold });
+        drill = TW.Generator.generate(spec.scenario, spec.type, spec.setup, { hold: spec.hold, shuffle: spec.shuffle });
         if (drill) drill.genMs = performance.now() - t0;
       } catch (err) {
         error = String(err && err.stack || err);
@@ -27,7 +27,7 @@
     return d;
   }
 
-  const keyOf = (spec) => spec.scenario + '|' + spec.type + '|' + spec.setup + '|' + spec.hold;
+  const keyOf = (spec) => [spec.scenario, spec.type, spec.setup, spec.hold, spec.shuffle].join('|');
 
   class GenService {
     constructor() {
@@ -70,7 +70,7 @@
         if (this.job !== job) return;
         this.job = null;
         const t0 = performance.now();
-        const d = TW.Generator.generate(job.spec.scenario, job.spec.type, job.spec.setup, { hold: job.spec.hold });
+        const d = TW.Generator.generate(job.spec.scenario, job.spec.type, job.spec.setup, { hold: job.spec.hold, shuffle: job.spec.shuffle });
         if (d) d.genMs = performance.now() - t0;
         job.resolve(d);
       }, 20);

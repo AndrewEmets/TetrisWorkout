@@ -56,7 +56,7 @@
 
     spec() {
       const s = this.settings.data.drill;
-      return { scenario: s.scenario, type: s.type, setup: s.setup, hold: this.g.hold };
+      return { scenario: s.scenario, type: s.type, setup: s.setup, hold: this.g.hold, shuffle: this.g.hold ? this.g.holdShuffle : 0 };
     }
 
     // Starts generating the next drill for the current selection (unless already ready or running).

@@ -157,6 +157,8 @@
       } else if (d.goal.kind === 'pc') detail = 'Clear the whole board using ' + d.queue.length + ' pieces. Stay under the dashed line.';
       else if (d.setup) detail = 'Place ' + d.setup + ' setup piece' + (d.setup > 1 ? 's' : '') + ' first, then spin the ' + d.goal.piece + '.';
       else detail = 'Spin the ' + d.goal.piece + ' into the slot.';
+      if (d.well && d.well.name) detail = 'Setup: ' + d.well.name + '. ' + detail;
+      if (d.needsHold) detail += ' The queue order needs hold.';
     }
     $('goal-detail').textContent = detail;
     const per = d && st.per[game.drillKey(d)];
@@ -208,6 +210,7 @@
     const p = game.pending;
     $('dbg-next').textContent = !p ? '—' : p.drill === undefined ? 'generating…' : p.drill ? 'ready (' + Math.round(p.drill.genMs || 0) + ' ms)' : 'failed';
     $('dbg-where').textContent = game.gen.background ? 'background worker' : 'main thread';
+    $('dbg-well').textContent = !d || d.goal.kind !== 'spin' ? '—' : d.well ? d.well.id : 'procedural';
   }
 
   function frame(now) {
