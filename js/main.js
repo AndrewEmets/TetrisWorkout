@@ -147,9 +147,35 @@
   resize();
 
   let last = performance.now();
+  // ---------- Debug panel ----------
+
+  const debugPanel = $('debug-panel');
+  try { debugPanel.open = localStorage.getItem('tetris-workout-debug-open') === '1'; } catch (e) { /* ignore */ }
+  debugPanel.addEventListener('toggle', () => {
+    try { localStorage.setItem('tetris-workout-debug-open', debugPanel.open ? '1' : '0'); } catch (e) { /* ignore */ }
+  });
+  let fpsFrames = 0, fpsSince = performance.now();
+  function updateDebug(now) {
+    fpsFrames++;
+    if (now - fpsSince < 500) return;
+    const fps = (fpsFrames * 1000) / (now - fpsSince);
+    fpsFrames = 0;
+    fpsSince = now;
+    if (!debugPanel.open) return;
+    $('dbg-fps').textContent = fps.toFixed(0);
+    const d = game.drill;
+    $('dbg-gen').textContent = d && d.genMs != null
+      ? Math.round(d.genMs) + ' ms' + (d.attempts ? ' (' + d.attempts + ' attempts)' : '')
+      : '—';
+    const p = game.pending;
+    $('dbg-next').textContent = !p ? '—' : p.drill === undefined ? 'generating…' : p.drill ? 'ready (' + Math.round(p.drill.genMs || 0) + ' ms)' : 'failed';
+    $('dbg-where').textContent = game.gen.background ? 'background worker' : 'main thread';
+  }
+
   function frame(now) {
     const dt = Math.min(100, now - last);
     last = now;
+    updateDebug(now);
     input.pollGamepads();
     game.update(dt);
     if (game.changed) { game.changed = false; updateInfo(); }

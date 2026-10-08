@@ -8,8 +8,10 @@
     self.onmessage = (e) => {
       const { id, spec } = e.data;
       let drill = null, error = null;
+      const t0 = performance.now();
       try {
         drill = TW.Generator.generate(spec.scenario, spec.type, spec.setup, { hold: spec.hold });
+        if (drill) drill.genMs = performance.now() - t0;
       } catch (err) {
         error = String(err && err.stack || err);
       }
@@ -67,7 +69,10 @@
       setTimeout(() => {
         if (this.job !== job) return;
         this.job = null;
-        job.resolve(TW.Generator.generate(job.spec.scenario, job.spec.type, job.spec.setup, { hold: job.spec.hold }));
+        const t0 = performance.now();
+        const d = TW.Generator.generate(job.spec.scenario, job.spec.type, job.spec.setup, { hold: job.spec.hold });
+        if (d) d.genMs = performance.now() - t0;
+        job.resolve(d);
       }, 20);
     }
 
