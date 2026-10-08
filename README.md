@@ -5,9 +5,11 @@ Each drill gives you a board and a queue. Pull off the required clear and you ge
 
 Plain HTML + JavaScript + canvas. No libraries and no build step.
 
+**▶ Play: https://andrewemets.github.io/TetrisWorkout/**
+
 ## Run
 
-Open `index.html` in a browser. That's it.
+Play online at the link above, or open `index.html` locally in a browser.
 
 ## Drills
 
