@@ -21,6 +21,22 @@
   };
   TW.Favorites.onChange(() => { game.changed = true; });
 
+  // Foldable side panels remember whether they are open.
+  const PANELS_KEY = 'tetris-workout-panels';
+  let panelState = {};
+  try {
+    panelState = JSON.parse(localStorage.getItem(PANELS_KEY)) || {};
+    if (localStorage.getItem('tetris-workout-debug-open') === '1') panelState.debug = true; // older key
+  } catch (e) { /* ignore */ }
+  for (const el of document.querySelectorAll('details.panel')) {
+    const key = el.dataset.panel;
+    if (typeof panelState[key] === 'boolean') el.open = panelState[key];
+    el.addEventListener('toggle', () => {
+      panelState[key] = el.open;
+      try { localStorage.setItem(PANELS_KEY, JSON.stringify(panelState)); } catch (e) { /* ignore */ }
+    });
+  }
+
   // ---------- Drill selectors ----------
 
   const { SCENARIOS, MAX_SETUP } = TW.Generator;
@@ -176,10 +192,6 @@
   // ---------- Debug panel ----------
 
   const debugPanel = $('debug-panel');
-  try { debugPanel.open = localStorage.getItem('tetris-workout-debug-open') === '1'; } catch (e) { /* ignore */ }
-  debugPanel.addEventListener('toggle', () => {
-    try { localStorage.setItem('tetris-workout-debug-open', debugPanel.open ? '1' : '0'); } catch (e) { /* ignore */ }
-  });
   let fpsFrames = 0, fpsSince = performance.now();
   function updateDebug(now) {
     fpsFrames++;

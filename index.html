@@ -25,13 +25,13 @@
   <main>
     <div id="stage"><canvas id="canvas"></canvas></div>
     <aside class="info">
-      <section>
-        <h2>Goal</h2>
+      <details class="panel" data-panel="goal" open>
+        <summary>Goal</summary>
         <p id="goal-text">—</p>
         <p id="goal-detail" class="muted"></p>
-      </section>
-      <section>
-        <h2>How to</h2>
+      </details>
+      <details class="panel" data-panel="howto" open>
+        <summary>How to</summary>
         <div id="guide-text" class="guide"></div>
         <button id="btn-demo" title="Animated step-by-step solution for this board">▶ Watch solution</button>
         <div id="demo-controls" class="hidden">
@@ -44,9 +44,9 @@
             <button id="demo-exit" title="Back to practice (R)">✕ Practice</button>
           </div>
         </div>
-      </section>
-      <section>
-        <h2>Stats</h2>
+      </details>
+      <details class="panel" data-panel="stats" open>
+        <summary>Stats</summary>
         <dl>
           <dt>This drill</dt><dd id="st-drill">—</dd>
           <dt>Total</dt><dd id="st-total">—</dd>
@@ -54,12 +54,12 @@
           <dt>Best streak</dt><dd id="st-best">—</dd>
         </dl>
         <button id="btn-reset-stats" class="small">Reset stats</button>
-      </section>
-      <section>
-        <h2>Keys</h2>
+      </details>
+      <details class="panel" data-panel="keys" open>
+        <summary>Keys</summary>
         <p id="keys-help" class="muted"></p>
-      </section>
-      <details id="debug-panel" class="debug">
+      </details>
+      <details id="debug-panel" class="panel debug" data-panel="debug">
         <summary>Debug</summary>
         <dl>
           <dt>FPS</dt><dd id="dbg-fps">—</dd>
