@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tetris Workout</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>Tetris Workout</h1>
+    <label>Drill <select id="sel-scenario"></select></label>
+    <label>Type <select id="sel-type"></select></label>
+    <label id="setup-wrap"><span id="setup-label">Setup pieces</span> <select id="sel-setup"></select></label>
+    <span class="spacer"></span>
+    <button id="btn-new" title="New board">New</button>
+    <button id="btn-retry" title="Retry this board">Retry</button>
+    <button id="btn-hint" title="Show / hide the solution">Hint</button>
+    <button id="btn-copy" title="Copy the board, queue and state as text (for bug reports)">⧉ Copy board</button>
+    <button id="btn-settings" title="Settings">⚙ Settings</button>
+  </header>
+
+  <main>
+    <div id="stage"><canvas id="canvas"></canvas></div>
+    <aside class="info">
+      <section>
+        <h2>Goal</h2>
+        <p id="goal-text">—</p>
+        <p id="goal-detail" class="muted"></p>
+      </section>
+      <section>
+        <h2>How to</h2>
+        <div id="guide-text" class="guide"></div>
+        <button id="btn-demo" title="Animated step-by-step solution for this board">▶ Watch solution</button>
+        <div id="demo-controls" class="hidden">
+          <p id="demo-caption"></p>
+          <div class="demo-buttons">
+            <button id="demo-prev" title="Step back (←)">◀</button>
+            <button id="demo-play" title="Play / pause (Space)">❚❚</button>
+            <button id="demo-next" title="Step forward (→)">▶</button>
+            <span id="demo-pos" class="muted"></span>
+            <button id="demo-exit" title="Back to practice (R)">✕ Practice</button>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h2>Stats</h2>
+        <dl>
+          <dt>This drill</dt><dd id="st-drill">—</dd>
+          <dt>Total</dt><dd id="st-total">—</dd>
+          <dt>Streak</dt><dd id="st-streak">—</dd>
+          <dt>Best streak</dt><dd id="st-best">—</dd>
+        </dl>
+        <button id="btn-reset-stats" class="small">Reset stats</button>
+      </section>
+      <section>
+        <h2>Keys</h2>
+        <p id="keys-help" class="muted"></p>
+      </section>
+    </aside>
+  </main>
+
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-box" role="dialog" aria-label="Settings">
+      <header>
+        <h2>Settings</h2>
+        <button id="settings-close" title="Close (Esc)">✕</button>
+      </header>
+      <nav class="tabs">
+        <button data-tab="controls" class="active">Controls</button>
+        <button data-tab="handling">Handling</button>
+        <button data-tab="game">Game</button>
+        <button data-tab="io">Import / Export</button>
+      </nav>
+      <section class="tab" data-tab="controls">
+        <p id="pad-status" class="muted"></p>
+        <table class="bindings">
+          <thead><tr><th>Action</th><th>Keyboard</th><th>Gamepad</th></tr></thead>
+          <tbody id="bindings"></tbody>
+        </table>
+        <p class="muted">Click a binding to remove it, + to add one. A key/button can only be bound to one action.</p>
+      </section>
+      <section class="tab hidden" data-tab="handling">
+        <p class="muted">Timings are in frames at 60 fps, like TETR.IO.</p>
+        <div id="fields-handling" class="fields"></div>
+      </section>
+      <section class="tab hidden" data-tab="game">
+        <div id="fields-game" class="fields"></div>
+      </section>
+      <section class="tab hidden" data-tab="io">
+        <div class="io-buttons">
+          <button id="io-download">Export to file</button>
+          <button id="io-copy">Copy to clipboard</button>
+          <button id="io-upload">Import from file</button>
+          <input id="io-file" type="file" accept=".json,application/json" hidden>
+        </div>
+        <textarea id="io-text" spellcheck="false"></textarea>
+        <div class="io-buttons">
+          <button id="io-apply">Apply text above</button>
+          <button id="io-reset" class="danger">Reset to defaults</button>
+          <span id="io-msg"></span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="js/pieces.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/srs.js"></script>
+  <script src="js/spin.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/openers.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/guides.js"></script>
+  <script src="js/genservice.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/debug.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
