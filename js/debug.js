@@ -70,7 +70,7 @@
   }
 
   // Generates n drills for every scenario/type/setup combination and replays their solutions.
-  // opts.shuffle: chance (%) of queues that need hold, opts.only: scenario keys to test, opts.side: opener side.
+  // opts.shuffle: chance (%) of queues that need hold, opts.only: scenario keys to test.
   function selfTest(n, setups, opts) {
     n = n || 3;
     setups = setups || [0, 1, 2, 3];
@@ -84,7 +84,7 @@
           const errors = [];
           for (let i = 0; i < n; i++) {
             const t0 = performance.now();
-            const d = TW.Generator.generate(sc, type, setup, { hold: true, shuffle: opts.shuffle || 0, side: opts.side });
+            const d = TW.Generator.generate(sc, type, setup, { hold: true, shuffle: opts.shuffle || 0 });
             ms += performance.now() - t0;
             if (!d) { gen++; continue; }
             if (d.well) tpl++;

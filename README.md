@@ -28,7 +28,8 @@ Play online at the link above, or open `index.html` locally in a browser.
   pieces can go anywhere, as long as the spin still works (for TKI: fill the two rows the TSD clears). In earlier
   steps the next bag builds on the exact shape, so fillers have to fill it, in any arrangement and order.
   After every piece a solver checks that the opener can still be finished, on either side; you only fail when
-  it can't. Mirrored openers always count; ⚙ Settings → Game → Opener side picks the side that is shown.
+  it can't. Every opener can also be built mirrored: queues are checked to work on both sides, and the
+  outline switches to the side you are building.
 
 Every board is checked by a solver before you see it.
 Some queues come in an order that only works with **hold** (set how often under ⚙ Settings → Game).

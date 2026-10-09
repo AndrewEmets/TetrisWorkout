@@ -56,8 +56,7 @@
 
     spec() {
       const s = this.settings.data.drill;
-      const side = s.scenario === 'OP' || s.scenario === 'PO' ? this.g.openerSide : null;
-      return { scenario: s.scenario, type: s.type, setup: s.setup, hold: this.g.hold, shuffle: this.g.hold ? this.g.holdShuffle : 0, side };
+      return { scenario: s.scenario, type: s.type, setup: s.setup, hold: this.g.hold, shuffle: this.g.hold ? this.g.holdShuffle : 0 };
     }
 
     // Starts generating the next drill for the current selection (unless already ready or running).
@@ -368,7 +367,8 @@
         live.push({ op: side.op, st });
       }
       if (!live.length) return this.fail(error);
-      this.ops = live;
+      // The side whose key pieces the player has placed is the one being built: show its outline.
+      this.ops = live.sort((a, b) => (b.st.keyHits || 0) - (a.st.keyHits || 0));
       // Fail early when the remaining pieces can no longer finish the opener on any side (small search budget).
       let queue = this.queue.slice(), hold = this.hold, cur = null;
       if (queue.length) cur = queue.shift();
@@ -378,7 +378,7 @@
       const solve = (side, strict, budget) => TW.Openers.solve(side.op,
         { board: this.board, st: TW.Openers.copyState(side.st), cur, queue, hold, holdUsed: false }, { budget, strict, hold: this.g.hold }).ok;
       const possible = live.some((side) => solve(side, true, 400)) || live.some((side) => solve(side, false, 150) !== false);
-      if (!possible) return this.fail('The remaining pieces can\'t finish ' + name0 + ' from here');
+      if (!possible) return this.fail('The rest of the queue can\'t finish ' + name0 + ' from here');
       this.spawnNext();
     }
 

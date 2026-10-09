@@ -34,7 +34,7 @@
     },
     game: {
       gravity: 0, lockDelay: 30, lockResets: 15,
-      hold: true, holdShuffle: 30, ghost: true, showTarget: true, openerSide: 'random', successDelay: 500, failDelay: 800,
+      hold: true, holdShuffle: 30, ghost: true, showTarget: true, successDelay: 500, failDelay: 800,
     },
     drill: { scenario: 'T', type: 'double', setup: 0 },
   };
@@ -60,7 +60,6 @@
       { path: 'game.holdShuffle', label: 'Queues that need hold', hint: 'Chance that a new board comes with a queue order that only works with hold', min: 0, max: 100, step: 5, unit: '%' },
       { path: 'game.ghost', label: 'Show ghost piece', type: 'bool' },
       { path: 'game.showTarget', label: 'Show opener shape outline', type: 'bool' },
-      { path: 'game.openerSide', label: 'Opener side', hint: 'Which side openers are shown and built on. Both sides always count.', type: 'select', options: [['random', 'Random'], ['normal', 'Normal'], ['mirrored', 'Mirrored']] },
       { path: 'game.successDelay', label: 'Pause after success', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'game.failDelay', label: 'Pause after miss', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'controls.deadzone', label: 'Gamepad stick deadzone', min: 0.1, max: 0.9, step: 0.05, unit: '' },

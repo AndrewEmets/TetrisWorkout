@@ -172,12 +172,6 @@ TW.module(function (TW) {
     if (!op || side !== 'm') return op;
     return mirrors[id] || (mirrors[id] = mirrorOpener(op));
   }
-  // Setting value ('normal' | 'mirrored' | 'random') -> side.
-  function pickSide(pref) {
-    if (pref === 'normal') return 'n';
-    if (pref === 'mirrored') return 'm';
-    return Math.random() < 0.5 ? 'n' : 'm';
-  }
 
   // Phase k, computed once per opener and side:
   //   targets: key pieces (type -> { cells, key }); suggest: filler types -> suggested cells;
@@ -318,6 +312,7 @@ TW.module(function (TW) {
       if (t) {
         if (t.key !== cellKey(cells)) return { error: 'That ' + type + ' is not where the ' + op.name + ' shape needs it' };
         st.targets.delete(type);
+        st.keyHits = (st.keyHits || 0) + 1;
       } else if (st.fillers.has(type)) {
         const err = fillerError(op, st, type, cells);
         if (err) return { error: err };
@@ -471,29 +466,27 @@ TW.module(function (TW) {
     }
   }
 
-  // Returns a drill with a solvable 7-bag queue, or null. side: 'n' | 'm'.
-  function generate(id, allowHold, side) {
-    const op = get(id, side);
+  // Returns a drill with a 7-bag queue that can build the opener on both sides, or null. Without hold such
+  // queues are rare, so a queue that works on the normal side only is the fallback.
+  // The recorded solution (hints, walkthrough) is for the normal side.
+  function generate(id, allowHold) {
+    const op = get(id, 'n');
     if (!op) return null;
+    const build = (o, queue) => solve(o, { board: new TW.Board(), st: settle(o, initState(o, 0)), cur: queue[0], queue: queue.slice(1), hold: null, holdUsed: false },
+      { budget: 6000, hold: allowHold, strict: true });
+    const drill = (queue, r, attempts) => ({
+      board: new TW.Board(), queue, solution: r.actions, goal: { kind: 'opener', text: op.name }, opener: op, side: 'n',
+      scenario: 'OP', type: id, setup: 0, attempts,
+    });
+    let fallback = null;
     for (let attempt = 0; attempt < 300; attempt++) {
       const queue = [].concat(...op.phases.map((ph) => shuffle(ph.bag.slice())));
-      const st = settle(op, initState(op, 0));
-      const r = solve(op, { board: new TW.Board(), st, cur: queue[0], queue: queue.slice(1), hold: null, holdUsed: false }, { budget: 6000, hold: allowHold, strict: true });
+      const r = build(op, queue);
       if (!r.ok) continue;
-      return {
-        board: new TW.Board(),
-        queue,
-        solution: r.actions,
-        goal: { kind: 'opener', text: op.name },
-        opener: op,
-        side: op.mirrored ? 'm' : 'n',
-        scenario: 'OP',
-        type: id,
-        setup: 0,
-        attempts: attempt + 1,
-      };
+      if (build(get(id, 'm'), queue).ok) return drill(queue, r, attempt + 1);
+      fallback = fallback || drill(queue, r, attempt + 1);
     }
-    return null;
+    return fallback;
   }
 
   // ---------- Perfect clear openers ----------
@@ -548,6 +541,6 @@ TW.module(function (TW) {
   TW.Generator.MAX_SETUP.po = 3;
 
   TW.Openers = {
-    OPENERS, get, pickSide, initState, copyState, settle, applyLock, solve, generate, genPCOpener, cellKey, finisherText,
+    OPENERS, get, initState, copyState, settle, applyLock, solve, generate, genPCOpener, cellKey, finisherText,
   };
 });

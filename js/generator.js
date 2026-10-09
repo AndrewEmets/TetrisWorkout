@@ -518,12 +518,11 @@ TW.module(function (TW) {
   }
 
   // Returns a drill { board, queue, solution, goal, scenario, type, setup } or null.
-  // opts: hold (hold allowed), shuffle (chance in % of a queue order that needs hold),
-  // side (openers: 'normal' | 'mirrored' | 'random').
+  // opts: hold (hold allowed), shuffle (chance in % of a queue order that needs hold).
   function generate(scenario, type, setup, opts) {
     opts = opts || {};
-    const side = TW.Openers.pickSide(opts.side);
-    if (scenario === 'OP') return TW.Openers.generate(type, opts.hold !== false, side);
+    if (scenario === 'OP') return TW.Openers.generate(type, opts.hold !== false);
+    const side = Math.random() < 0.5 ? 'n' : 'm'; // PC openers: the first bag is built on a random side
     let goal = makeGoal(scenario, type);
     let drill;
     if (scenario === 'PO') {
