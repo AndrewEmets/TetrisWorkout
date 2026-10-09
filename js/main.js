@@ -99,6 +99,16 @@
   });
 
   const blurAfter = (id, fn) => document.getElementById(id).addEventListener('click', (e) => { fn(); e.currentTarget.blur(); });
+  // Phone toolbar: the controls fold under the ☰ button; a button press or a tap elsewhere closes it.
+  const bar = document.getElementById('bar');
+  const menuBtn = document.getElementById('btn-menu');
+  const setMenu = (open) => { bar.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); };
+  menuBtn.addEventListener('click', () => { setMenu(!bar.classList.contains('open')); menuBtn.blur(); });
+  document.getElementById('bar-menu').addEventListener('click', (e) => { if (e.target.closest('button')) setMenu(false); });
+  document.addEventListener('pointerdown', (e) => { if (!bar.contains(e.target)) setMenu(false); });
+  blurAfter('q-retry', () => game.onPress('retry'));
+  blurAfter('q-new', () => game.onPress('skip'));
+
   blurAfter('btn-prev', () => game.onPress('prev'));
   blurAfter('btn-fav', () => input.onPress('favorite'));
   blurAfter('btn-favs', () => TW.FavoritesUI.show());
@@ -152,6 +162,7 @@
     const d = game.drill;
     const st = game.stats;
     $('goal-text').textContent = d ? d.goal.text : '—';
+    $('bar-title').textContent = d ? d.goal.text + (d.setup ? ' · ' + (d.scenario === 'PC' ? d.queue.length + ' pieces' : d.setup + ' setup') : '') : '';
     let detail = '';
     if (d) {
       const op = game.opener;

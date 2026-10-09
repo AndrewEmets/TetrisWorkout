@@ -43,9 +43,12 @@ The walkthrough explains wall kicks and why a rotation counts as a spin.
 On a phone or tablet, play on the board area:
 
 - **Drag left / right:** move the piece, one column per cell of finger travel.
-- **Drag down:** soft drop. **Flick down:** hard drop. **Flick up:** hold.
+- **Drag down:** soft drop, one row per cell of finger travel. **Flick down:** hard drop, also in the middle of
+  a sideways drag. **Flick up:** hold.
 - **Tap the left / right half of the screen:** rotate CW / CCW.
   ⚙ Settings → Game can swap the taps and change how far a drag moves the piece.
+
+On a phone the toolbar folds under the ☰ button; retry and next stay next to it.
 
 ## Mechanics
 

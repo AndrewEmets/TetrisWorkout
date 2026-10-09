@@ -51,6 +51,9 @@ select { padding: 4px 6px; }
 .bar h1 { font-size: 16px; margin: 0 8px 0 0; letter-spacing: 0.5px; }
 .bar label { color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .bar .spacer { flex: 1; }
+/* On wide screens the menu is just part of the toolbar; on phones it folds under the ☰ button. */
+.bar-menu { display: contents; }
+.menu-btn, .bar-title, .bar-quick { display: none; }
 
 main {
   flex: 1;
@@ -115,14 +118,33 @@ main {
 
 @media (max-width: 760px) {
   body { height: auto; min-height: 100%; }
-  .bar { gap: 6px 8px; padding: 6px 8px; }
+  .bar { gap: 8px; padding: 6px 8px; position: relative; flex-wrap: nowrap; }
   .bar h1 { display: none; }
   .bar .spacer { display: none; }
   .bar button { padding: 4px 8px; }
+  .menu-btn { display: block; font-size: 18px; line-height: 1; padding: 4px 10px; }
+  .bar-title { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .bar-quick { display: flex; gap: 6px; }
+  .bar-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 8px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  }
+  .bar.open .bar-menu { display: flex; }
+  .bar.open .menu-btn { border-color: var(--accent); background: #3a2444; }
   main { flex-direction: column; gap: 8px; padding: 6px 8px; }
   .info { width: auto; overflow: visible; }
   /* The board takes the screen below the toolbar; the panels follow further down. */
-  #stage { flex: none; height: min(calc(100dvh - 120px), calc((100vw - 16px) * 23.5 / 18)); min-height: 50vh; align-items: flex-start; }
+  #stage { flex: none; height: min(calc(100dvh - 60px), calc((100vw - 16px) * 23.5 / 18)); min-height: 50vh; align-items: flex-start; }
 }
 
 /* Settings modal */
