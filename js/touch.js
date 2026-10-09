@@ -27,13 +27,13 @@
       else input.release('softDrop', SRC);
     }
 
-    // Was the finger moving down fast when it left the screen? Returns when that swipe started, or null.
-    // Measured from any point of the last FLICK_WINDOW ms, so a swipe right after a sideways drag isn't
-    // slowed down by the sideways part.
-    function flickStart(g, time, y) {
+    // Was the finger moving fast down (dir 1) or up (dir -1) when it left the screen? Returns when that swipe
+    // started, or null. Measured from any point of the last FLICK_WINDOW ms, so a swipe right after a sideways
+    // drag isn't slowed down by the sideways part.
+    function flickStart(g, time, y, dir) {
       while (g.trail.length > 1 && time - g.trail[0][0] > FLICK_WINDOW) g.trail.shift();
       const dist = FLICK_CELLS * unit();
-      const p = g.trail.find(([t1, y1]) => y - y1 >= dist && (y - y1) / Math.max(1, time - t1) >= FLICK_SPEED);
+      const p = g.trail.find(([t1, y1]) => dir * (y - y1) >= dist && dir * (y - y1) / Math.max(1, time - t1) >= FLICK_SPEED);
       return p ? p[0] : null;
     }
 
@@ -64,8 +64,8 @@
         t.mode = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
       }
       if (t.mode === 'h') {
-        // While the finger heads mostly downward (e.g. into a hard drop swipe), sideways drift is ignored.
-        if (ddy > 0 && ddy > 2 * Math.abs(ddx)) t.x += ddx;
+        // While the finger heads mostly down or up (into a hard drop or hold swipe), sideways drift is ignored.
+        if (Math.abs(ddy) > 2 * Math.abs(ddx)) t.x += ddx;
         while (Math.abs(e.clientX - t.x) >= u) {
           const d = Math.sign(e.clientX - t.x);
           t.x += d * u;
@@ -96,7 +96,9 @@
         press(left !== settings.data.controls.touchRotateSwap ? 'rotCW' : 'rotCCW');
         return;
       }
-      const start = flickStart(g, e.timeStamp, e.clientY);
+      // Swipe up and let go during a sideways drag: hold (a vertical swipe up holds right away, see above).
+      if (!g.held && flickStart(g, e.timeStamp, e.clientY, -1) !== null) { press('hold'); return; }
+      const start = flickStart(g, e.timeStamp, e.clientY, 1);
       if (start === null) return;
       // Undo sideways steps made during the swipe itself, so a slanted swipe drops where it started.
       for (const [time, d] of g.moves.slice().reverse()) {
@@ -114,7 +116,7 @@
   // Short description for the keys panel.
   function help(settings) {
     const swap = settings.data.controls.touchRotateSwap;
-    return 'Touch: drag ←/→ move · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop · swipe ↑ hold · tap left / right: rotate ' +
+    return 'Touch: drag ←/→ move · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop · swipe ↑ hold (or swipe ↑ and let go while dragging ←/→) · tap left / right: rotate ' +
       (swap ? 'CCW / CW' : 'CW / CCW');
   }
 
