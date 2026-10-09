@@ -61,6 +61,8 @@
       this.dasCharge = 0;
       this.arrAcc = 0;
       this.hintVisible = false;
+      this.stale = new Set(); // actions held from before the current piece appeared: ignored until released
+      this.pieceId = 0; // counts spawned pieces (touch gestures that started before a new piece are dropped)
       this.stats = loadStats();
       this.marathonStats = loadMarathon(); // best results per marathon config: { games, score, lines, time }
       this.mara = null; // marathon run in progress: level, lines, score, ...
@@ -278,6 +280,14 @@
       this.changed = true;
       if (!p) { if (this.mara) this.marathonOver(false, 'Top out'); else this.fail('Top out'); return; }
       this.piece = p;
+      this.pieceId++;
+      // Input from the previous piece doesn't move or drop this one: held keys need a new press.
+      if (!this.h.carryInput) {
+        for (const a of ['left', 'right', 'softDrop']) if (this.input.isHeld(a)) this.stale.add(a);
+        this.dir = 0;
+        this.dasCharge = 0;
+        this.arrAcc = 0;
+      }
       this.spin = 'none';
       this.lockTimer = 0;
       this.lockResets = 0;
@@ -662,10 +672,12 @@
     }
 
     onRelease(a) {
+      this.stale.delete(a);
       if (a !== 'left' && a !== 'right') return;
       const d = a === 'left' ? -1 : 1;
       if (this.dir !== d) return;
-      if (this.input.isHeld(d < 0 ? 'right' : 'left')) {
+      const other = d < 0 ? 'right' : 'left';
+      if (this.input.isHeld(other) && !this.stale.has(other)) {
         this.dir = -d;
         if (this.h.cancelDasOnDirChange) this.dasCharge = 0;
         this.arrAcc = 0;
@@ -703,7 +715,7 @@
         if (!this.input.enabled || this.menuOpen) return; // paused while a dialog or the phone menu is open
         this.mara.time += dt;
       }
-      const sd = this.input.isHeld('softDrop');
+      const sd = this.input.isHeld('softDrop') && !this.stale.has('softDrop');
       if (this.h.preferSoftDrop) { this.updateSoftDrop(dt, sd); this.updateShift(dt); }
       else { this.updateShift(dt); this.updateSoftDrop(dt, sd); }
       if (!this.piece) return;
@@ -752,11 +764,11 @@
     }
   }
 
-  // Marathon gravity for a level: multiplied by the same factor every level, from gStart at level 1 to gMax
-  // at maxLevel (a straight line on a log scale), then stays at gMax.
+  // Marathon gravity for a level: logarithmic, so it rises quickly over the first levels and then levels off,
+  // from gStart at level 1 to gTop at topLevel, then stays at gTop.
   Game.levelGravity = (m, level) => {
-    const t = Math.min(1, (level - 1) / Math.max(1, m.maxLevel - 1));
-    return Math.min(m.gMax, m.gStart * Math.pow(Math.max(m.gMax, m.gStart) / m.gStart, t));
+    const t = Math.min(1, Math.log(Math.max(1, level)) / Math.log(Math.max(2, m.topLevel)));
+    return m.gStart + (m.gTop - m.gStart) * t;
   };
 
   Game.FRAME = FRAME;

@@ -31,7 +31,7 @@
     handling: {
       das: 10, arr: 2, dcd: 1, sdf: 6,
       cancelDasOnDirChange: true, preferSoftDrop: true,
-      irs: 'off', ihs: 'off', hardDropGuard: 0,
+      irs: 'off', ihs: 'off', hardDropGuard: 0, carryInput: false,
     },
     game: {
       gravity: 0, lockDelay: 30, lockResets: 15,
@@ -46,8 +46,8 @@
       marathon: { scenario: 'MA', type: 'marathon', setup: 0 },
     },
     // Marathon: lines = goal (0 = endless); garbage = rows kept on the board (0 = off), each with `holes` holes.
-    // Gravity grows by the same factor every level, from gStart (level 1) to gMax (maxLevel and up).
-    marathon: { lines: 150, startLevel: 1, garbage: 0, holes: 1, linesPerLevel: 10, gStart: 0.02, gMax: 20, maxLevel: 20 },
+    // Gravity grows logarithmically with the level, from gStart (level 1) to gTop (topLevel and up).
+    marathon: { lines: 150, startLevel: 1, garbage: 0, holes: 1, linesPerLevel: 10, gStart: 0.02, gTop: 1, topLevel: 20 },
   };
 
   // Field specs for the Handling and Game tabs.
@@ -60,6 +60,7 @@
       { path: 'handling.hardDropGuard', label: 'Hard drop guard', hint: 'Ignore hard drop for N frames after a new piece (0 = off)', min: 0, max: 20, step: 1, unit: 'f' },
       { path: 'handling.cancelDasOnDirChange', label: 'Cancel DAS when changing directions', type: 'bool' },
       { path: 'handling.preferSoftDrop', label: 'Prefer soft drop over movement', type: 'bool' },
+      { path: 'handling.carryInput', label: 'Held moves carry over to the next piece', hint: 'Off: a held move or soft drop stops when a new piece appears; press it again. On: like TETR.IO (a charged DAS moves the new piece right away).', type: 'bool' },
       { path: 'handling.irs', label: 'Initial rotation (IRS)', type: 'select', options: [['off', 'Off'], ['hold', 'Hold']] },
       { path: 'handling.ihs', label: 'Initial hold (IHS)', type: 'select', options: [['off', 'Off'], ['hold', 'Hold']] },
     ],
@@ -80,8 +81,8 @@
       { heading: 'Marathon' },
       { path: 'marathon.linesPerLevel', label: 'Lines per level', min: 1, max: 50, step: 1, unit: '' },
       { path: 'marathon.gStart', label: 'Gravity at level 1', hint: 'Cells per frame (0.0167 G = 1 row per second)', min: 0.005, max: 1, step: 0.005, unit: 'G' },
-      { path: 'marathon.gMax', label: 'Top gravity', hint: '20 G drops pieces to the floor instantly', min: 0.1, max: 20, step: 0.1, unit: 'G' },
-      { path: 'marathon.maxLevel', label: 'Level with top gravity', hint: 'Gravity is multiplied by the same factor every level until this one (even steps on a log scale)', min: 2, max: 40, step: 1, unit: '' },
+      { path: 'marathon.gTop', label: 'Top gravity', hint: '1 G = one row per frame; 20 G drops pieces to the floor instantly', min: 0.1, max: 20, step: 0.1, unit: 'G' },
+      { path: 'marathon.topLevel', label: 'Level with top gravity', hint: 'Gravity rises quickly over the first levels and then levels off, reaching the top here (logarithmic)', min: 2, max: 40, step: 1, unit: '' },
     ],
   };
 

@@ -96,8 +96,8 @@
 
   const MARATHON = `
     <p><b>Marathon:</b> an endless 7-bag queue. Every few lines (10 by default) the level goes up and the
-    pieces fall faster. Gravity is multiplied by the same factor each level, up to 20 G (pieces land
-    instantly). Lock delay and the speed curve are under ⚙ Settings → Game.</p>
+    pieces fall faster. Gravity rises quickly over the first levels and then levels off (logarithmic), up to 1 G at
+    level 20. Lock delay and the speed curve are under ⚙ Settings → Game.</p>
     <p><b>Garbage</b> keeps the chosen number of gray rows on the board. Each row has the chosen number of
     holes at random columns. Cleared garbage rows come back from the bottom after the next piece that
     doesn't clear a line.</p>

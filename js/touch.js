@@ -46,12 +46,15 @@
         id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, top: e.clientY, bottom: e.clientY,
         t0: e.timeStamp, mode: null, held: false, soft: false, slide: false, dead: 0, trail: [[e.timeStamp, e.clientY]],
         lastX: e.clientX, lastY: e.clientY, moves: [], // moves: [time, direction] of each sideways step
+        piece: game.pieceId, // a new piece ends this gesture (it doesn't act on the next piece)
       };
     });
 
     el.addEventListener('pointermove', (e) => {
       if (!t || e.pointerId !== t.id) return;
       e.preventDefault();
+      // A new piece appeared during this touch (the last one locked, or was held): ignore the rest of it.
+      if (t.piece !== game.pieceId) { softDrop(t, false); return; }
       const u = unit(), y = e.clientY;
       const ddx = e.clientX - t.lastX, ddy = y - t.lastY;
       t.lastX = e.clientX;
@@ -102,7 +105,7 @@
       const g = t;
       t = null;
       softDrop(g, false);
-      if (cancelled) return;
+      if (cancelled || g.piece !== game.pieceId) return;
       const u = unit();
       if (!g.mode && Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < u * 0.5 && e.timeStamp - g.t0 < TAP_MS) {
         const left = e.clientX < window.innerWidth / 2;
