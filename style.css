@@ -117,7 +117,10 @@ main {
 #demo-exit { margin-left: auto; }
 
 @media (max-width: 760px) {
-  body { height: auto; min-height: 100%; }
+  /* The page doesn't scroll: the play area takes the whole screen under the toolbar (all of it takes touch
+     gestures), and the panels open over it with the ℹ button. */
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body { height: 100dvh; }
   .bar { gap: 8px; padding: 6px 8px; position: relative; flex-wrap: nowrap; }
   .bar h1 { display: none; }
   .bar .spacer { display: none; }
@@ -141,10 +144,21 @@ main {
   }
   .bar.open .bar-menu { display: flex; }
   .bar.open .menu-btn { border-color: var(--accent); background: #3a2444; }
-  main { flex-direction: column; gap: 8px; padding: 6px 8px; }
-  .info { width: auto; overflow: visible; }
-  /* The board takes the screen below the toolbar; the panels follow further down. */
-  #stage { flex: none; height: min(calc(100dvh - 60px), calc((100vw - 16px) * 23.5 / 18)); min-height: 50vh; align-items: flex-start; }
+  main { position: relative; padding: 6px 8px; }
+  #stage { align-items: flex-start; }
+  .info {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    width: auto;
+    padding: 8px;
+    background: var(--bg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  body.info-open .info { display: block; }
+  body.info-open #q-info { border-color: var(--accent); background: #3a2444; }
 }
 
 /* Settings modal */

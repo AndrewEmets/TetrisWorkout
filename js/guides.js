@@ -104,7 +104,7 @@
     <p><b>Score</b> follows the guideline, times the level: single / double / triple / quad 100 / 300 / 500 / 800,
     T-spins 400 – 1600, mini and other spins 100 – 400, back-to-back quads and spins ×1.5, combos
     +50 per step, perfect clears +800 – 2000. Soft drop scores 1 per row, hard drop 2.</p>
-    <p>The game pauses while Settings, Favorites or the phone menu is open.</p>`;
+    <p>The game pauses while Settings, Favorites, the phone menu or the ℹ panels are open.</p>`;
 
   function forDrill(scenario, type) {
     if (scenario === 'MA') return MARATHON;

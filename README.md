@@ -65,7 +65,8 @@ On a phone or tablet, play on the board area:
   it and tap a spin (lock delay starts after you lift; it can be turned off in ⚙ Settings → Game).
   ⚙ Settings → Game can swap the taps and change how far a drag moves the piece.
 
-On a phone the toolbar folds under the ☰ button; retry and next stay next to it.
+On a phone the toolbar folds under the ☰ button; retry and next stay next to it. The board area fills the
+screen and takes gestures everywhere, even around the board; the goal, guide and stats open with the ℹ button.
 
 ## Mechanics
 

@@ -154,10 +154,16 @@
   // Phone toolbar: the controls fold under the ☰ button; a button press or a tap elsewhere closes it.
   const bar = document.getElementById('bar');
   const menuBtn = document.getElementById('btn-menu');
-  const setMenu = (open) => { bar.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); game.menuOpen = open; };
-  menuBtn.addEventListener('click', () => { setMenu(!bar.classList.contains('open')); menuBtn.blur(); });
+  // The info panels (goal, guide, stats) open over the board with the ℹ button. Marathon pauses meanwhile.
+  const infoBtn = document.getElementById('q-info');
+  const paused = () => { game.menuOpen = bar.classList.contains('open') || document.body.classList.contains('info-open'); };
+  const setMenu = (open) => { bar.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); paused(); };
+  const setInfo = (open) => { document.body.classList.toggle('info-open', open); infoBtn.setAttribute('aria-expanded', String(open)); paused(); };
+  menuBtn.addEventListener('click', () => { setMenu(!bar.classList.contains('open')); setInfo(false); menuBtn.blur(); });
+  infoBtn.addEventListener('click', () => { setInfo(!document.body.classList.contains('info-open')); setMenu(false); infoBtn.blur(); });
   document.getElementById('bar-menu').addEventListener('click', (e) => { if (e.target.closest('button')) setMenu(false); });
   document.addEventListener('pointerdown', (e) => { if (!bar.contains(e.target)) setMenu(false); });
+  document.getElementById('btn-demo').addEventListener('click', () => setInfo(false)); // watch it on the board
   blurAfter('q-retry', () => game.onPress('retry'));
   blurAfter('q-new', () => game.onPress('skip'));
 
