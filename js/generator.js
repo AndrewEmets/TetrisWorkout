@@ -321,10 +321,8 @@ TW.module(function (TW) {
   function genFromTemplate(goal, setupN) {
     const pool = TW.Wells ? TW.Wells.pool(goal, setupN) : [];
     if (!pool.length) return null;
-    const total = pool.reduce((sum, t) => sum + t.weight, 0);
     for (let attempt = 0; attempt < 200; attempt++) {
-      let r = Math.random() * total, t = pool[0];
-      for (const c of pool) { r -= c.weight; if (r < 0) { t = c; break; } }
+      const t = pool[rand(pool.length)];
       const e = TW.Wells.embed(t, setupN);
       if (!e) continue;
       const v = validateSpin(e.board, e.setups, goal, e.target);

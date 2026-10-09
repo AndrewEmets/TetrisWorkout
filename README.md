@@ -61,6 +61,15 @@ Default keys: ← → move, ↓ soft drop, Space hard drop, Z / X rotate, A 180�
 node tools/mine-wells.js [templates per drill type] [seconds per drill type]
 ```
 
+## Cache busting
+
+`index.html` loads every script with a `?v=<hash>` stamp so browsers pick up new versions.
+`tools/stamp-versions.js` updates the stamps; enable the pre-commit hook that runs it with:
+
+```
+git config core.hooksPath tools
+```
+
 ## Credits
 
 - Opener shapes come from [four.lol](https://four.lol/openers/practical-openers).

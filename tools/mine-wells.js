@@ -1,5 +1,5 @@
 // Builds the well template library (js/wells-data.js) for spin drills.
-// Usage: node tools/mine-wells.js [templates per drill type = 40] [seconds per drill type = 90]
+// Usage: node tools/mine-wells.js [templates per drill type = 120] [seconds per drill type = 300]
 //
 // Sources: the named setups below, and wells from the procedural generator. For each well, setup pieces are
 // peeled off near the slot so that every one is needed (see TW.Generator.validateSpin). The patch around the
@@ -19,8 +19,8 @@ const { W, H } = TW.Board;
 const { cellsOf } = TW.Pieces;
 const G = TW.Generator;
 
-const PER_TYPE = +process.argv[2] || 40;
-const SECONDS = +process.argv[3] || 90;
+const PER_TYPE = +process.argv[2] || 120;
+const SECONDS = +process.argv[3] || 300;
 const MAX_SETUP = 3;
 
 // Named setups: the finished well (no setup pieces); `clear` = rows the goal clears.
@@ -30,7 +30,14 @@ const NAMED = [
   { name: 'TST', piece: 'T', spin: 'full', lines: 3, rows: ['...##', '..###', '.....', '##*##', '#**##', '##*##'], clear: [3, 4, 5] },
 ];
 
-const key = (t) => [t.piece, t.spin, t.lines, t.rows.join('/'), t.clear.join(','), t.wall || ''].join('|');
+// Two wells count as the same when the goal piece and the setup pieces sit the same way relative to each
+// other; the stack around them doesn't matter (it changes with every placement anyway).
+function key(t) {
+  const cells = [];
+  t.rows.forEach((r, y) => [...r].forEach((c, x) => { if (c === '*' || (c >= '1' && c <= '9')) cells.push([x, y, c]); }));
+  const mx = Math.min(...cells.map((c) => c[0])), my = Math.min(...cells.map((c) => c[1]));
+  return [t.piece, t.spin, t.lines, cells.map(([x, y, c]) => x - mx + ',' + (y - my) + c).sort().join(';')].join('|');
+}
 const canon = (t) => [key(t), key(TW.Wells.mirror(t))].sort()[0];
 
 // How often the template works when placed into a random stack (all setup pieces in the queue).
@@ -122,7 +129,7 @@ function mine(label, make, target) {
   console.log(label.padEnd(16), String(n).padStart(3), 'templates', ((Date.now() - t0) / 1000).toFixed(0) + 's');
 }
 
-for (const n of NAMED) mine(n.name + ' (named)', (s) => consider(fromNamed(n, s), n.name), Math.ceil(PER_TYPE / 4));
+for (const n of NAMED) mine(n.name + ' (named)', (s) => consider(fromNamed(n, s), n.name), Math.ceil(PER_TYPE / 6));
 for (const [sc, def] of Object.entries(G.SCENARIOS)) {
   if (sc === 'PC' || sc === 'OP' || sc === 'Z' || sc === 'J') continue; // Z / J come from mirrored S / L
   for (const [type] of def.types) {

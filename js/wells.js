@@ -74,7 +74,7 @@ TW.module(function (TW) {
       for (const t of TW.WELL_DATA || []) {
         for (const v of t.mirror ? [t, mirror(t)] : [t]) {
           const p = parse(v);
-          if (p) { p.weight = p.name ? 4 : 1; parsed.push(p); }
+          if (p) parsed.push(p);
         }
       }
     }
