@@ -45,7 +45,8 @@ On a phone or tablet, play on the board area:
 - **Drag left / right:** move the piece, one column per cell of finger travel.
 - **Drag down and keep the finger down:** soft drop, like holding the soft drop key; move back up to stop.
   It also works in the middle of a sideways drag, and sideways drags keep moving the piece while it soft
-  drops, so you can slide it under an overhang without lifting the finger.
+  drops, so you can slide it under an overhang without lifting the finger. The first sideways step there needs
+  a little extra travel (a dead zone, adjustable in ⚙ Settings → Game) so the piece doesn't shift by accident.
 - **Swipe down fast and let go:** hard drop. **Swipe up:** hold; during a sideways drag, swipe up and let go.
   Sideways drift during these swipes doesn't move the piece.
 - **Tap the left / right half of the screen:** rotate CW / CCW.

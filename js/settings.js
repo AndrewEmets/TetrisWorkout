@@ -26,7 +26,7 @@
         retry: ['b8'], prev: [], skip: ['b9'], hint: [], favorite: [], target: [],
       },
       deadzone: 0.5,
-      touchSensitivity: 1, touchRotateSwap: false,
+      touchSensitivity: 1, touchRotateSwap: false, touchSlideDeadzone: 1,
     },
     handling: {
       das: 10, arr: 2, dcd: 1, sdf: 6,
@@ -65,6 +65,7 @@
       { path: 'game.failDelay', label: 'Pause after miss', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'controls.deadzone', label: 'Gamepad stick deadzone', min: 0.1, max: 0.9, step: 0.05, unit: '' },
       { path: 'controls.touchSensitivity', label: 'Touch drag per move', hint: 'Finger travel for one column, in board cells', min: 0.5, max: 2, step: 0.1, unit: 'cells' },
+      { path: 'controls.touchSlideDeadzone', label: 'Touch: sideways dead zone in soft drop', hint: 'Extra finger travel before the first sideways move while soft dropping', min: 0, max: 3, step: 0.25, unit: 'cells' },
       { path: 'controls.touchRotateSwap', label: 'Swap touch rotation (tap left = CCW, right = CW)', type: 'bool' },
     ],
   };

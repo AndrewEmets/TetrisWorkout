@@ -44,7 +44,7 @@
       try { el.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
       t = {
         id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, top: e.clientY, bottom: e.clientY,
-        t0: e.timeStamp, mode: null, held: false, soft: false, slide: false, trail: [[e.timeStamp, e.clientY]],
+        t0: e.timeStamp, mode: null, held: false, soft: false, slide: false, dead: 0, trail: [[e.timeStamp, e.clientY]],
         lastX: e.clientX, lastY: e.clientY, moves: [], // moves: [time, direction] of each sideways step
       };
     });
@@ -69,9 +69,11 @@
       if (t.mode === 'h' || t.slide) {
         // While the finger heads mostly down or up (into a hard drop or hold swipe), sideways drift is ignored.
         if (Math.abs(ddy) > 2 * Math.abs(ddx)) t.x += ddx;
-        while (Math.abs(e.clientX - t.x) >= u) {
+        // During soft drop the first sideways step needs extra travel (dead zone), against accidental moves.
+        while (Math.abs(e.clientX - t.x) >= u + t.dead) {
           const d = Math.sign(e.clientX - t.x);
-          t.x += d * u;
+          t.x += d * (u + t.dead);
+          t.dead = 0;
           if (game.touchShift(d)) t.moves.push([e.timeStamp, d]);
         }
       }
@@ -85,7 +87,11 @@
         if (y - t.top >= (t.mode === 'h' ? 1.5 : 1) * u) {
           softDrop(t, true);
           t.bottom = y;
-          if (!t.slide) { t.slide = true; t.x = e.clientX; }
+          if (!t.slide) {
+            t.slide = true;
+            t.x = e.clientX;
+            if (t.mode === 'v') t.dead = settings.data.controls.touchSlideDeadzone * u;
+          }
         }
       }
       if (t.mode === 'v' && !t.held && !t.soft && y - t.y0 <= -1.5 * u) { t.held = true; press('hold'); }
