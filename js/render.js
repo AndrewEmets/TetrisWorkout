@@ -183,16 +183,33 @@
       const nx = fx + W * c + 0.5 * c;
       this.text('NEXT', nx, 0.9 * c, c * 0.55, '#8b93a3');
       ctx.fillStyle = '#15171c';
-      const shown = game.queue.slice(0, 6);
+      const shown = game.queue.slice(0, game.preview);
       ctx.fillRect(nx, 1.4 * c, sw, Math.max(1, shown.length) * 2.6 * c + 0.4 * c);
       shown.forEach((t, i) => this.mini(t, nx, 1.6 * c + i * 2.6 * c, sw, 2.4 * c));
       if (!shown.length && game.phase === 'play') this.text('—', nx + sw / 2, 2.7 * c, c * 0.6, '#555c69', 'center');
-      if (game.queue.length > 6) this.text('+' + (game.queue.length - 6) + ' more', nx, 1.4 * c + 6 * 2.6 * c + 1 * c, c * 0.45, '#8b93a3');
+      if (!game.marathon && game.queue.length > 6) this.text('+' + (game.queue.length - 6) + ' more', nx, 1.4 * c + 6 * 2.6 * c + 1 * c, c * 0.45, '#8b93a3');
 
       // Last clear name.
       const lc = game.lastClear;
       if (lc && lc.text && performance.now() - lc.t < 1500) {
         this.text(lc.text, mid, 6 * c, c * 0.5, '#e8ebf1', 'center', 700, sw + 0.1 * c);
+      }
+
+      // Marathon: level, lines, score and time under the hold box.
+      const m = game.mara;
+      if (m) {
+        const rows = [
+          ['LEVEL', String(m.level)],
+          ['LINES', m.lines + (m.target ? '/' + m.target : '')],
+          ['SCORE', m.score.toLocaleString('en-US')],
+          ['TIME', formatTime(m.time)],
+          ['PPS', m.time > 0 ? (m.pieces / (m.time / 1000)).toFixed(2) : '0.00'],
+        ];
+        rows.forEach(([label, value], i) => {
+          const y = 7.4 * c + i * 1.7 * c;
+          this.text(label, 0.5 * c, y, c * 0.42, '#8b93a3', 'left', 600, sw);
+          this.text(value, 0.5 * c, y + 0.65 * c, c * 0.6, '#e8ebf1', 'left', 700, sw);
+        });
       }
 
       // Drill goal under the field.
@@ -210,5 +227,12 @@
     }
   }
 
+  // m:ss.d
+  function formatTime(ms) {
+    const s = ms / 1000;
+    return Math.floor(s / 60) + ':' + (s % 60).toFixed(1).padStart(4, '0');
+  }
+
+  Renderer.formatTime = formatTime;
   TW.Renderer = Renderer;
 })(window.TW);

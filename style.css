@@ -52,7 +52,7 @@ select { padding: 4px 6px; }
 .bar label { color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .bar .spacer { flex: 1; }
 /* On wide screens the menu is just part of the toolbar; on phones it folds under the ☰ button. */
-.bar-menu { display: contents; }
+.bar-menu, .sub-opts { display: contents; }
 .menu-btn, .bar-title, .bar-quick { display: none; }
 
 main {
@@ -195,6 +195,7 @@ table.bindings { width: 100%; border-collapse: collapse; }
 .fields { display: flex; flex-direction: column; gap: 10px; }
 .field { display: grid; grid-template-columns: 200px 1fr 80px 90px; align-items: center; gap: 4px 10px; }
 .field .field-name { font-weight: 500; }
+.fields-heading { margin: 10px 0 0; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .field input[type="range"] { width: 100%; accent-color: var(--accent); }
 .field input[type="number"] { width: 80px; padding: 3px 6px; }
 .field input[type="checkbox"] { justify-self: start; width: 18px; height: 18px; accent-color: var(--accent); }

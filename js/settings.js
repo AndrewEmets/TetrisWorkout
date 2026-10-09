@@ -38,6 +38,16 @@
       hold: true, holdShuffle: 30, ghost: true, showTarget: true, successDelay: 500, failDelay: 800,
     },
     drill: { scenario: 'T', type: 'double', setup: 0 },
+    // Last selection in each mode, restored when switching back to it.
+    modes: {
+      spin: { scenario: 'T', type: 'double', setup: 0 },
+      opener: { scenario: 'OP', type: 'tki', setup: 0 },
+      pc: { scenario: 'PC', type: '4', setup: 2 },
+      marathon: { scenario: 'MA', type: 'marathon', setup: 0 },
+    },
+    // Marathon: lines = goal (0 = endless); garbage = rows kept on the board (0 = off), each with `holes` holes.
+    // Gravity grows by the same factor every level, from gStart (level 1) to gMax (maxLevel and up).
+    marathon: { lines: 150, startLevel: 1, garbage: 0, holes: 1, linesPerLevel: 10, gStart: 0.02, gMax: 20, maxLevel: 20 },
   };
 
   // Field specs for the Handling and Game tabs.
@@ -54,7 +64,7 @@
       { path: 'handling.ihs', label: 'Initial hold (IHS)', type: 'select', options: [['off', 'Off'], ['hold', 'Hold']] },
     ],
     game: [
-      { path: 'game.gravity', label: 'Gravity', hint: 'Cells per frame (0 = off; pieces only lock on hard drop)', min: 0, max: 20, step: 0.01, unit: 'G' },
+      { path: 'game.gravity', label: 'Gravity', hint: 'Cells per frame in drills (0 = off; pieces only lock on hard drop). Marathon has its own speed curve below.', min: 0, max: 20, step: 0.01, unit: 'G' },
       { path: 'game.lockDelay', label: 'Lock delay', hint: 'Only used when gravity is on', min: 1, max: 120, step: 1, unit: 'f' },
       { path: 'game.lockResets', label: 'Lock resets', min: 0, max: 30, step: 1, unit: '' },
       { path: 'game.hold', label: 'Allow hold', type: 'bool' },
@@ -67,6 +77,11 @@
       { path: 'controls.touchSensitivity', label: 'Touch drag per move', hint: 'Finger travel for one column, in board cells', min: 0.5, max: 2, step: 0.1, unit: 'cells' },
       { path: 'controls.touchSlideDeadzone', label: 'Touch: sideways dead zone in soft drop', hint: 'Extra finger travel before the first sideways move while soft dropping', min: 0, max: 3, step: 0.25, unit: 'cells' },
       { path: 'controls.touchRotateSwap', label: 'Swap touch rotation (tap left = CCW, right = CW)', type: 'bool' },
+      { heading: 'Marathon' },
+      { path: 'marathon.linesPerLevel', label: 'Lines per level', min: 1, max: 50, step: 1, unit: '' },
+      { path: 'marathon.gStart', label: 'Gravity at level 1', hint: 'Cells per frame (0.0167 G = 1 row per second)', min: 0.005, max: 1, step: 0.005, unit: 'G' },
+      { path: 'marathon.gMax', label: 'Top gravity', hint: '20 G drops pieces to the floor instantly', min: 0.1, max: 20, step: 0.1, unit: 'G' },
+      { path: 'marathon.maxLevel', label: 'Level with top gravity', hint: 'Gravity is multiplied by the same factor every level until this one (even steps on a log scale)', min: 2, max: 40, step: 1, unit: '' },
     ],
   };
 
@@ -248,6 +263,13 @@
       const root = document.getElementById('fields-' + group);
       root.innerHTML = '';
       for (const f of FIELDS[group]) {
+        if (f.heading) {
+          const h = document.createElement('h3');
+          h.className = 'fields-heading';
+          h.textContent = f.heading;
+          root.appendChild(h);
+          continue;
+        }
         const row = document.createElement('label');
         row.className = 'field';
         const name = document.createElement('span');

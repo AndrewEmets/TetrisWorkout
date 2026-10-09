@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Tetris Workout</title>
-  <link rel="stylesheet" href="style.css?v=af94dc27">
+  <link rel="stylesheet" href="style.css?v=5dea3929">
 </head>
 <body>
   <header class="bar" id="bar">
@@ -16,9 +16,8 @@
       <button id="q-new" title="Next board">▶</button>
     </span>
     <div id="bar-menu" class="bar-menu">
-      <label>Drill <select id="sel-scenario"></select></label>
-      <label>Type <select id="sel-type"></select></label>
-      <label id="setup-wrap"><span id="setup-label">Setup pieces</span> <select id="sel-setup"></select></label>
+      <label>Mode <select id="sel-mode"></select></label>
+      <span id="sub-opts" class="sub-opts"></span>
       <span class="spacer"></span>
       <button id="btn-prev" title="Previous board (B)">◀ Prev</button>
       <button id="btn-new" title="Next board — a new one, or forward again after going back (N)">Next ▶</button>
@@ -57,10 +56,10 @@
       <details class="panel" data-panel="stats" open>
         <summary>Stats</summary>
         <dl>
-          <dt>This drill</dt><dd id="st-drill">—</dd>
-          <dt>Total</dt><dd id="st-total">—</dd>
-          <dt>Streak</dt><dd id="st-streak">—</dd>
-          <dt>Best streak</dt><dd id="st-best">—</dd>
+          <dt id="st-drill-l">This drill</dt><dd id="st-drill">—</dd>
+          <dt id="st-total-l">Total</dt><dd id="st-total">—</dd>
+          <dt id="st-streak-l">Streak</dt><dd id="st-streak">—</dd>
+          <dt id="st-best-l">Best streak</dt><dd id="st-best">—</dd>
         </dl>
         <button id="btn-reset-stats" class="small">Reset stats</button>
       </details>
@@ -146,15 +145,15 @@
   <script src="js/wells.js?v=e71945e3"></script>
   <script src="js/openers.js?v=1b2b9331"></script>
   <script src="js/demo.js?v=161f43d1"></script>
-  <script src="js/guides.js?v=aab20857"></script>
+  <script src="js/guides.js?v=2334ff5d"></script>
   <script src="js/genservice.js?v=e292bbf9"></script>
   <script src="js/favorites.js?v=ae3ddddc"></script>
-  <script src="js/settings.js?v=850709cd"></script>
+  <script src="js/settings.js?v=69b3a984"></script>
   <script src="js/input.js?v=a272184b"></script>
   <script src="js/touch.js?v=d7e0524a"></script>
-  <script src="js/game.js?v=44adbcf3"></script>
-  <script src="js/render.js?v=8e53d57e"></script>
+  <script src="js/game.js?v=97a8142a"></script>
+  <script src="js/render.js?v=39b6fabd"></script>
   <script src="js/debug.js?v=3a8bb21e"></script>
-  <script src="js/main.js?v=64356b25"></script>
+  <script src="js/main.js?v=ca59781b"></script>
 </body>
 </html>

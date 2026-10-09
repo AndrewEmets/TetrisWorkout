@@ -4,6 +4,31 @@
 
   const FRAME = 1000 / 60;
   const STATS_KEY = 'tetris-workout-stats';
+  const MARATHON_KEY = 'tetris-workout-marathon';
+  const PREVIEW = 5; // next pieces shown in endless modes
+
+  // Guideline scoring (multiplied by the level): plain clears, T-spins and mini / all-spins by lines cleared,
+  // perfect clear bonus. Back-to-back quads and spins get x1.5; combos add 50 x combo x level.
+  const SCORE_LINES = [0, 100, 300, 500, 800];
+  const SCORE_SPIN = [400, 800, 1200, 1600, 1600];
+  const SCORE_MINI = [100, 200, 400, 800, 800];
+  const SCORE_PC = [0, 800, 1200, 1800, 2000];
+
+  function loadMarathon() {
+    try {
+      const s = JSON.parse(localStorage.getItem(MARATHON_KEY));
+      if (s && typeof s === 'object') return s;
+    } catch (e) { /* ignore */ }
+    return {};
+  }
+
+  function shuffled(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
   function loadStats() {
     try {
@@ -37,6 +62,8 @@
       this.arrAcc = 0;
       this.hintVisible = false;
       this.stats = loadStats();
+      this.marathonStats = loadMarathon(); // best results per marathon config: { games, score, lines, time }
+      this.mara = null; // marathon run in progress: level, lines, score, ...
       this.changed = true; // tells the UI to refresh the info panel
       input.onPress = (a) => this.onPress(a);
       input.onRelease = (a) => this.onRelease(a);
@@ -49,10 +76,28 @@
 
     currentKey() {
       const s = this.settings.data.drill;
+      if (s.scenario === 'MA') return 'MA|' + this.marathonKey();
       return s.scenario + '|' + s.type + '|' + s.setup;
     }
 
     drillKey(d) { return d.scenario + '|' + d.type + '|' + d.setup; }
+
+    // Marathon options that make a different game (and keep a separate best score).
+    marathonKey() {
+      const m = this.settings.data.marathon;
+      return [m.lines, m.startLevel, m.garbage, m.garbage ? m.holes : 0].join('|');
+    }
+
+    get marathon() { return !!this.drill && this.drill.goal.kind === 'marathon'; }
+
+    // Next pieces shown: all of a drill's queue, a few in endless modes.
+    get preview() { return this.marathon ? PREVIEW : 6; }
+
+    // Gravity in cells per frame: the marathon level's, otherwise the setting.
+    get gravity() {
+      if (!this.mara) return this.g.gravity;
+      return Game.levelGravity(this.settings.data.marathon, this.mara.level);
+    }
 
     spec() {
       const s = this.settings.data.drill;
@@ -61,6 +106,7 @@
 
     // Starts generating the next drill for the current selection (unless already ready or running).
     prefetch() {
+      if (this.settings.data.drill.scenario === 'MA') return null;
       const spec = this.spec();
       const key = TW.genKey(spec);
       if (this.pending && this.pending.key === key) return this.pending;
@@ -101,6 +147,7 @@
     newDrill() {
       const token = ++this.genToken;
       this.piece = null;
+      if (this.settings.data.drill.scenario === 'MA') { this.startMarathon(); return; }
       const fwd = this.historyIndex(1);
       if (fwd >= 0) {
         this.histPos = fwd;
@@ -151,6 +198,8 @@
     startAttempt() {
       if (!this.drill) return;
       this.demo = null;
+      this.mara = null;
+      if (this.marathon) { this.startMarathonRun(); return; }
       // Openers count on either side: one progress state per side that still fits, the drill's own side first.
       const d = this.drill;
       this.ops = d.opener
@@ -224,9 +273,10 @@
     }
 
     spawn(type) {
+      if (this.mara) this.fillQueue();
       const p = TW.Search.spawnPiece(this.board, type);
       this.changed = true;
-      if (!p) { this.fail('Top out'); return; }
+      if (!p) { if (this.mara) this.marathonOver(false, 'Top out'); else this.fail('Top out'); return; }
       this.piece = p;
       this.spin = 'none';
       this.lockTimer = 0;
@@ -263,7 +313,7 @@
     }
 
     lockReset() {
-      if (this.g.gravity > 0 && this.grounded() && this.lockResets < this.g.lockResets) {
+      if (this.gravity > 0 && this.grounded() && this.lockResets < this.g.lockResets) {
         this.lockTimer = 0;
         this.lockResets++;
       }
@@ -306,9 +356,10 @@
     }
 
     hardDrop() {
-      let moved = false;
-      while (this.board.fits(this.piece.type, this.piece.rot, this.piece.x, this.piece.y + 1)) { this.piece.y++; moved = true; }
+      let moved = 0;
+      while (this.board.fits(this.piece.type, this.piece.rot, this.piece.x, this.piece.y + 1)) { this.piece.y++; moved++; }
       if (moved) this.spin = 'none';
+      if (this.mara) this.mara.score += 2 * moved;
       this.lockPiece();
     }
 
@@ -326,6 +377,7 @@
       this.lastClear = { text: pc ? (name ? name + ' + PC' : 'PERFECT CLEAR') : name, t: performance.now() };
 
       const goal = this.drill.goal;
+      if (goal.kind === 'marathon') return this.marathonLock(p, spin, lines, pc);
       if (goal.kind === 'opener') return this.openerLock(p, cells, spin, lines, name);
       if (goal.kind === 'pc') {
         if (pc) return this.success('PERFECT CLEAR');
@@ -349,6 +401,115 @@
         }
       }
       this.spawnNext();
+    }
+
+    // ---------- Marathon ----------
+
+    startMarathon() {
+      const m = this.settings.data.marathon;
+      const text = 'Marathon' + (m.lines ? ' · ' + m.lines + ' lines' : ' · endless');
+      this.drill = { scenario: 'MA', type: 'marathon', setup: 0, goal: { kind: 'marathon', text }, board: new TW.Board(), queue: [], solution: [], placements: [], expected: [] };
+      this.hintVisible = false;
+      this.startAttempt();
+    }
+
+    startMarathonRun() {
+      const m = this.settings.data.marathon;
+      this.ops = null;
+      this.mara = {
+        key: this.marathonKey(), target: m.lines, startLevel: m.startLevel, level: m.startLevel, lines: 0, score: 0,
+        pieces: 0, time: 0, combo: -1, b2b: false, garbage: m.garbage, holes: Math.min(m.holes, 9),
+      };
+      this.board = new TW.Board();
+      this.addGarbage();
+      this.queue = [];
+      this.fillQueue();
+      this.hold = null;
+      this.locks = 0;
+      this.hintUsed = false;
+      this.phase = 'play';
+      this.flash = null;
+      this.lastClear = null;
+      this.changed = true;
+      this.spawnNext();
+    }
+
+    // Endless 7-bag queue, always at least a full bag ahead.
+    fillQueue() {
+      while (this.queue.length < 7) this.queue.push(...shuffled(TW.Pieces.TYPES.slice()));
+    }
+
+    // Keeps `garbage` gray rows with random holes on the board, pushing new ones up from the floor.
+    // Returns false when that pushes the stack out of the top.
+    addGarbage() {
+      const m = this.mara;
+      if (!m.garbage) return true;
+      const { W, H } = TW.Board;
+      const cells = this.board.cells, GRAY = TW.Pieces.STACK_ID;
+      let have = 0;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) if (cells[y * W + x] === GRAY) { have++; break; }
+      }
+      const add = m.garbage - have;
+      if (add <= 0) return true;
+      for (let i = 0; i < add * W; i++) if (cells[i]) return false;
+      cells.copyWithin(0, add * W);
+      for (let y = H - add; y < H; y++) {
+        const holes = new Set(shuffled([...Array(W).keys()]).slice(0, m.holes));
+        for (let x = 0; x < W; x++) cells[y * W + x] = holes.has(x) ? 0 : GRAY;
+      }
+      return true;
+    }
+
+    marathonLock(p, spin, lines, pc) {
+      const m = this.mara;
+      m.pieces++;
+      const level = m.level;
+      let points = spin === 'full' && p.type === 'T' ? SCORE_SPIN[lines] : spin !== 'none' ? SCORE_MINI[lines] : SCORE_LINES[lines];
+      const notes = [];
+      if (lines) {
+        const hard = lines >= 4 || spin !== 'none';
+        if (hard && m.b2b) { points *= 1.5; notes.push('B2B'); }
+        m.b2b = hard;
+        m.combo++;
+        if (m.combo > 0) { points += 50 * m.combo; notes.push(m.combo + ' COMBO'); }
+        if (pc) points += SCORE_PC[lines];
+      } else {
+        m.combo = -1;
+      }
+      m.score += Math.round(points * level);
+      m.lines += lines;
+      m.level = m.startLevel + Math.floor(m.lines / this.settings.data.marathon.linesPerLevel);
+      if (notes.length && this.lastClear.text) this.lastClear.text += ' · ' + notes.join(' · ');
+      if (m.level > level) this.lastClear = { text: 'LEVEL ' + m.level, t: this.lastClear.t };
+      if (m.target && m.lines >= m.target) return this.marathonOver(true);
+      if (!lines && !this.addGarbage()) return this.marathonOver(false, 'Garbage pushed the stack out');
+      this.spawnNext();
+    }
+
+    // End of a marathon run: the result stays up until Retry / Next. Keeps the best results per config.
+    marathonOver(done, reason) {
+      const m = this.mara;
+      this.phase = 'over';
+      this.piece = null;
+      const best = this.marathonStats[m.key] || (this.marathonStats[m.key] = { games: 0, score: 0, lines: 0, time: 0 });
+      const newBest = m.score > best.score;
+      best.games++;
+      best.score = Math.max(best.score, m.score);
+      best.lines = Math.max(best.lines, m.lines);
+      if (done && (!best.time || m.time < best.time)) best.time = m.time;
+      try { localStorage.setItem(MARATHON_KEY, JSON.stringify(this.marathonStats)); } catch (e) { /* ignore */ }
+      const sub = m.score.toLocaleString('en-US') + ' points · ' + m.lines + ' lines' + (newBest ? ' · new best!' : '');
+      this.flash = done
+        ? { text: 'COMPLETE', sub, color: '#58c45a' }
+        : { text: 'GAME OVER', sub: (reason ? reason + ' · ' : '') + sub, color: '#e05050' };
+      this.changed = true;
+    }
+
+    resetMarathonStats() {
+      delete this.marathonStats[this.marathonKey()];
+      try { localStorage.setItem(MARATHON_KEY, JSON.stringify(this.marathonStats)); } catch (e) { /* ignore */ }
+      this.changed = true;
     }
 
     // Current opener progress (the first side that still fits) and its opener.
@@ -464,6 +625,7 @@
       if (a === 'skip') { this.newDrill(); return; }
       if (a === 'prev') { this.prevDrill(); return; }
       if (a === 'hint') {
+        if (this.marathon) return;
         this.hintVisible = !this.hintVisible;
         this.changed = true;
         if (this.hintVisible && this.phase === 'play') this.hintUsed = true;
@@ -537,12 +699,16 @@
         return;
       }
       if (this.phase !== 'play' || !this.piece) return;
+      if (this.mara) {
+        if (!this.input.enabled || this.menuOpen) return; // paused while a dialog or the phone menu is open
+        this.mara.time += dt;
+      }
       const sd = this.input.isHeld('softDrop');
       if (this.h.preferSoftDrop) { this.updateSoftDrop(dt, sd); this.updateShift(dt); }
       else { this.updateShift(dt); this.updateSoftDrop(dt, sd); }
       if (!this.piece) return;
 
-      const grav = this.g.gravity;
+      const grav = this.gravity;
       if (grav > 0) {
         if (!sd) {
           this.gravAcc += (dt / FRAME) * grav;
@@ -577,13 +743,21 @@
     updateSoftDrop(dt, held) {
       if (!held || !this.piece) { this.softAcc = 0; return; }
       if (this.h.sdf >= 41) { while (this.stepDown()); return; }
-      this.softAcc += (dt / FRAME) * this.h.sdf * Math.max(this.g.gravity, 1 / 12);
+      this.softAcc += (dt / FRAME) * this.h.sdf * Math.max(this.gravity, 1 / 12);
       while (this.softAcc >= 1) {
         this.softAcc -= 1;
         if (!this.stepDown()) { this.softAcc = 0; break; }
+        if (this.mara) this.mara.score++;
       }
     }
   }
+
+  // Marathon gravity for a level: multiplied by the same factor every level, from gStart at level 1 to gMax
+  // at maxLevel (a straight line on a log scale), then stays at gMax.
+  Game.levelGravity = (m, level) => {
+    const t = Math.min(1, (level - 1) / Math.max(1, m.maxLevel - 1));
+    return Math.min(m.gMax, m.gStart * Math.pow(Math.max(m.gMax, m.gStart) / m.gStart, t));
+  };
 
   Game.FRAME = FRAME;
   TW.Game = Game;

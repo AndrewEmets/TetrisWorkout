@@ -16,7 +16,7 @@
   TW.Favorites.load();
   const gamePress = input.onPress;
   input.onPress = (a) => {
-    if (a === 'favorite') { if (game.drill) TW.Favorites.toggle(game.drill); }
+    if (a === 'favorite') { if (game.drill && !game.marathon) TW.Favorites.toggle(game.drill); }
     else if (a === 'target') settings.set('game.showTarget', !settings.data.game.showTarget);
     else gamePress(a);
   };
@@ -38,36 +38,90 @@
     });
   }
 
-  // ---------- Drill selectors ----------
+  // ---------- Mode selectors ----------
+  // Mode (spin / opener / perfect clear / marathon), then that mode's own options. Drills keep their
+  // scenario / type / setup keys underneath; the last selection of each mode is remembered.
 
   const { SCENARIOS, MAX_SETUP } = TW.Generator;
-  const selScenario = document.getElementById('sel-scenario');
-  const selType = document.getElementById('sel-type');
-  const selSetup = document.getElementById('sel-setup');
+  const MODES = [['spin', 'Spin'], ['opener', 'Opener'], ['pc', 'Perfect Clear'], ['marathon', 'Marathon']];
+  const SPIN_PIECES = ['T', 'S', 'Z', 'L', 'J', 'I'];
+  const modeOf = (sc) => (sc === 'MA' ? 'marathon' : sc === 'OP' ? 'opener' : sc === 'PC' || sc === 'PO' ? 'pc' : 'spin');
+  const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  const selMode = document.getElementById('sel-mode');
+  const subOpts = document.getElementById('sub-opts');
+  for (const [k, label] of MODES) selMode.add(new Option(label, k));
 
-  for (const [key, sc] of Object.entries(SCENARIOS)) selScenario.add(new Option(sc.label, key));
-
-  function fillDrillSelectors() {
-    const d = settings.data.drill;
-    if (!SCENARIOS[d.scenario]) d.scenario = 'T';
+  // Makes the selection valid: known scenario, a type of that scenario, setup in range.
+  function normalize(d) {
+    if (d.scenario === 'MA') { d.type = 'marathon'; d.setup = 0; return d; }
+    if (!SCENARIOS[d.scenario]) { d.scenario = 'T'; d.type = 'double'; }
     const sc = SCENARIOS[d.scenario];
     if (!sc.types.some((t) => t[0] === d.type)) d.type = sc.types[0][0];
     const max = d.scenario === 'PC' ? MAX_SETUP.pc : d.scenario === 'OP' ? 0 : d.scenario === 'PO' ? MAX_SETUP.po : MAX_SETUP.spin;
     d.setup = Math.min(Math.max(0, d.setup | 0), max);
+    return d;
+  }
 
-    selScenario.value = d.scenario;
-    selType.innerHTML = '';
-    for (const [k, label] of sc.types) selType.add(new Option(label, k));
-    selType.value = d.type;
-    selSetup.innerHTML = '';
-    for (let i = 0; i <= max; i++) {
-      selSetup.add(new Option(d.scenario === 'PC' ? String(i + 2) : String(i), String(i)));
+  // The option selects for the current mode: { label, options: [[value, text]], value, set(value) }.
+  function subOptions(d) {
+    const mode = modeOf(d.scenario);
+    const setupOpt = (max, text) => ({ label: 'Setup pieces', options: range(0, max).map((i) => [i, text ? text(i) : String(i)]), value: d.setup, set: (v) => { d.setup = +v; } });
+    if (mode === 'spin') {
+      return [
+        { label: 'Piece', options: SPIN_PIECES.map((p) => [p, p]), value: d.scenario, set: (v) => { d.scenario = v; } },
+        { label: 'Type', options: SCENARIOS[d.scenario].types.map((t) => [t[0], t[1]]), value: d.type, set: (v) => { d.type = v; } },
+        setupOpt(MAX_SETUP.spin),
+      ];
     }
-    selSetup.value = String(d.setup);
-    document.getElementById('setup-label').textContent = d.scenario === 'PC' ? 'Pieces' : 'Setup pieces';
-    document.getElementById('setup-wrap').classList.toggle('hidden', d.scenario === 'OP');
+    if (mode === 'opener') {
+      return [{ label: 'Opener', options: SCENARIOS.OP.types, value: d.type, set: (v) => { d.type = v; } }];
+    }
+    if (mode === 'pc') {
+      const kinds = SCENARIOS.PC.types.map((t) => ['PC:' + t[0], t[1]])
+        .concat(SCENARIOS.PO.types.map((t) => ['PO:' + t[0], t[1] + ' (2nd bag)']));
+      const opts = [{ label: 'Type', options: kinds, value: d.scenario + ':' + d.type, set: (v) => { [d.scenario, d.type] = v.split(':'); } }];
+      if (d.scenario === 'PC') opts.push(Object.assign(setupOpt(MAX_SETUP.pc, (i) => String(i + 2)), { label: 'Pieces' }));
+      else opts.push(setupOpt(MAX_SETUP.po));
+      return opts;
+    }
+    const m = settings.data.marathon;
+    const opts = [
+      { label: 'Lines', options: [[150, '150'], [300, '300'], [0, 'Endless']], value: m.lines, set: (v) => { m.lines = +v; } },
+      { label: 'Start level', options: range(1, 20).map((i) => [i, String(i)]), value: m.startLevel, set: (v) => { m.startLevel = +v; } },
+      { label: 'Garbage', options: [[0, 'Off']].concat(range(1, 12).map((i) => [i, i + (i > 1 ? ' rows' : ' row')])), value: m.garbage, set: (v) => { m.garbage = +v; } },
+    ];
+    if (m.garbage) opts.push({ label: 'Holes', options: range(1, 5).map((i) => [i, String(i)]), value: m.holes, set: (v) => { m.holes = +v; } });
+    return opts;
+  }
+
+  function fillDrillSelectors() {
+    const d = normalize(settings.data.drill);
+    const mode = modeOf(d.scenario);
+    settings.data.modes[mode] = { scenario: d.scenario, type: d.type, setup: d.setup };
+    selMode.value = mode;
+    subOpts.innerHTML = '';
+    for (const o of subOptions(d)) {
+      const label = document.createElement('label');
+      label.append(o.label + ' ');
+      const sel = document.createElement('select');
+      for (const [v, text] of o.options) sel.add(new Option(text, String(v)));
+      sel.value = String(o.value);
+      sel.addEventListener('change', () => {
+        o.set(sel.value);
+        normalize(d);
+        fillDrillSelectors();
+        settings.save(); // the onChange listener below starts a new drill
+        sel.blur();
+      });
+      label.appendChild(sel);
+      subOpts.appendChild(label);
+    }
+    for (const id of ['btn-prev', 'btn-hint', 'btn-target', 'btn-fav']) $(id).classList.toggle('hidden', mode === 'marathon');
+    $('btn-new').textContent = mode === 'marathon' ? 'New game ▶' : 'Next ▶';
     renderGuide();
   }
+
+  function $(id) { return document.getElementById(id); }
 
   function renderGuide() {
     const d = settings.data.drill;
@@ -77,14 +131,12 @@
     document.getElementById('guide-text').innerHTML = html;
   }
 
-  function onDrillChange() {
-    settings.data.drill = { scenario: selScenario.value, type: selType.value, setup: +selSetup.value };
+  selMode.addEventListener('change', () => {
+    settings.data.drill = Object.assign({}, settings.data.modes[selMode.value]);
     fillDrillSelectors();
-    settings.save(); // the onChange listener below starts a new drill
-  }
-  selScenario.addEventListener('change', () => { selType.value = ''; onDrillChange(); selScenario.blur(); });
-  selType.addEventListener('change', () => { onDrillChange(); selType.blur(); });
-  selSetup.addEventListener('change', () => { onDrillChange(); selSetup.blur(); });
+    settings.save();
+    selMode.blur();
+  });
   fillDrillSelectors();
 
   // Settings import/reset may change the drill selection.
@@ -102,7 +154,7 @@
   // Phone toolbar: the controls fold under the ☰ button; a button press or a tap elsewhere closes it.
   const bar = document.getElementById('bar');
   const menuBtn = document.getElementById('btn-menu');
-  const setMenu = (open) => { bar.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); };
+  const setMenu = (open) => { bar.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); game.menuOpen = open; };
   menuBtn.addEventListener('click', () => { setMenu(!bar.classList.contains('open')); menuBtn.blur(); });
   document.getElementById('bar-menu').addEventListener('click', (e) => { if (e.target.closest('button')) setMenu(false); });
   document.addEventListener('pointerdown', (e) => { if (!bar.contains(e.target)) setMenu(false); });
@@ -138,11 +190,13 @@
   blurAfter('demo-next', () => game.demoStep(1));
   blurAfter('demo-play', () => game.demoToggle());
   blurAfter('demo-exit', () => game.stopDemo());
-  blurAfter('btn-reset-stats', () => { if (confirm('Reset all stats?')) game.resetStats(); });
+  blurAfter('btn-reset-stats', () => {
+    if (game.marathon) { if (confirm('Reset the best results for this marathon setup?')) game.resetMarathonStats(); }
+    else if (confirm('Reset all stats?')) game.resetStats();
+  });
 
   // ---------- Info panel ----------
 
-  const $ = (id) => document.getElementById(id);
   const pct = (s, a) => (a ? s + ' / ' + a + ' (' + Math.round((100 * s) / a) + '%)' : '—');
 
   const touchDevice = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -158,15 +212,44 @@
     ]).join('\n');
   }
 
+  function marathonDetail() {
+    const m = settings.data.marathon;
+    const g = TW.Game.levelGravity(m, game.mara ? game.mara.level : m.startLevel);
+    let s = (m.lines ? 'Clear ' + m.lines + ' lines. ' : 'Play as long as you can. ') +
+      'The level goes up every ' + m.linesPerLevel + ' lines, and with it the gravity (now ' +
+      (g >= 1 ? g.toFixed(1) : g.toFixed(3)) + ' G).';
+    if (m.garbage) s += ' ' + m.garbage + ' garbage row' + (m.garbage > 1 ? 's' : '') + ' with ' + m.holes + ' hole' + (m.holes > 1 ? 's' : '') + ' each: cleared rows come back after the next piece that clears nothing.';
+    return s;
+  }
+
+  function updateStats() {
+    const st = game.stats;
+    const label = (id, text) => { $(id + '-l').textContent = text; };
+    if (game.marathon) {
+      const b = game.marathonStats[game.marathonKey()] || { games: 0, score: 0, lines: 0, time: 0 };
+      label('st-drill', 'Best score'); $('st-drill').textContent = b.games ? b.score.toLocaleString('en-US') : '—';
+      label('st-total', 'Most lines'); $('st-total').textContent = b.games ? b.lines : '—';
+      label('st-streak', 'Best time'); $('st-streak').textContent = b.time ? TW.Renderer.formatTime(b.time) : '—';
+      label('st-best', 'Games'); $('st-best').textContent = b.games;
+      return;
+    }
+    const d = game.drill;
+    const per = d && st.per[game.drillKey(d)];
+    label('st-drill', 'This drill'); $('st-drill').textContent = per ? pct(per.s, per.a) : '—';
+    label('st-total', 'Total'); $('st-total').textContent = pct(st.successes, st.attempts);
+    label('st-streak', 'Streak'); $('st-streak').textContent = st.streak;
+    label('st-best', 'Best streak'); $('st-best').textContent = st.best;
+  }
+
   function updateInfo() {
     const d = game.drill;
-    const st = game.stats;
     $('goal-text').textContent = d ? d.goal.text : '—';
     $('bar-title').textContent = d ? d.goal.text + (d.setup ? ' · ' + (d.scenario === 'PC' ? d.queue.length + ' pieces' : d.setup + ' setup') : '') : '';
     let detail = '';
     if (d) {
       const op = game.opener;
-      if (op) {
+      if (d.goal.kind === 'marathon') detail = marathonDetail();
+      else if (op) {
         const k = Math.min(game.op ? game.op.k : 0, op.phases.length - 1);
         detail = 'Step ' + (k + 1) + ' of ' + op.phases.length + ': ' + op.phases[k].label + '.';
         if (op.mirrored) detail += ' (Mirrored.)';
@@ -178,11 +261,7 @@
       if (d.needsHold) detail += ' The queue order needs hold.';
     }
     $('goal-detail').textContent = detail;
-    const per = d && st.per[game.drillKey(d)];
-    $('st-drill').textContent = per ? pct(per.s, per.a) : '—';
-    $('st-total').textContent = pct(st.successes, st.attempts);
-    $('st-streak').textContent = st.streak;
-    $('st-best').textContent = st.best;
+    updateStats();
     $('keys-help').textContent = keysHelp();
     $('btn-hint').classList.toggle('active', game.hintVisible);
     $('btn-target').classList.toggle('active', settings.data.game.showTarget);
@@ -194,7 +273,7 @@
     $('btn-favs').textContent = 'Favorites' + (TW.Favorites.list.length ? ' (' + TW.Favorites.list.length + ')' : '');
     const df = game.demoFrame();
     $('demo-controls').classList.toggle('hidden', !df);
-    $('btn-demo').classList.toggle('hidden', !!df);
+    $('btn-demo').classList.toggle('hidden', !!df || game.marathon);
     if (df) {
       $('demo-caption').textContent = df.caption;
       $('demo-pos').textContent = (game.demo.i + 1) + ' / ' + game.demo.frames.length;

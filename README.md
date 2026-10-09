@@ -1,6 +1,7 @@
 # Tetris Workout
 
-A small trainer for practicing Tetris techniques: T-spins, S/Z/L/J/I spins, perfect clears and popular openers.
+A small trainer for practicing Tetris techniques: T-spins, S/Z/L/J/I spins, perfect clears and popular openers,
+plus a classic Marathon.
 Each drill gives you a board and a queue. Pull off the required clear and you get a new board; miss it and you retry the same one.
 
 Plain HTML + JavaScript + canvas. No libraries and no build step.
@@ -11,7 +12,10 @@ Plain HTML + JavaScript + canvas. No libraries and no build step.
 
 Play online at the link above, or open `index.html` locally in a browser.
 
-## Drills
+## Modes
+
+Pick a **Mode** (Spin, Opener, Perfect Clear, Marathon) in the toolbar; the selects next to it are that mode's
+options. Each mode remembers its last selection.
 
 - **Spins:** T-spin Mini / Single / Double / Triple, plus S, Z, L, J and I spins (single to triple).
   Boards come from a library of wells: named setups (TSD, TSS, TST) plus a few hundred mined ones.
@@ -19,7 +23,7 @@ Play online at the link above, or open `index.html` locally in a browser.
   **Setup pieces** (0–3) make you build the last pieces of the well yourself. Every setup piece is needed:
   the spin isn't possible before the last one is placed, or with any one of them kept in hold.
 - **Perfect clear:** 2-line or 4-line, with 2–8 pieces.
-- **PC openers:** PCO and MKO. The first-bag shape is already built; finish the second-bag perfect clear.
+- **PC openers** (under Perfect Clear, "2nd bag"): PCO and MKO. The first-bag shape is already built; finish the second-bag perfect clear.
   **Setup pieces** (0–3) set how many pieces are yours to place: 0 means only the last piece, 3 the whole
   perfect clear (the kept I or T plus three pieces). Any perfect clear counts, not just the one the solver found.
 - **Openers:** TKI, DT Cannon, Hachispin, PCO and MKO. Bag orders are 7-bag sequences checked to be buildable.
@@ -31,7 +35,14 @@ Play online at the link above, or open `index.html` locally in a browser.
   it can't. Every opener can also be built mirrored: queues are checked to work on both sides, and the
   outline switches to the side you are building.
 
-Every board is checked by a solver before you see it.
+- **Marathon:** an endless 7-bag game for 150 or 300 lines, or endless, from a chosen start level. The level goes
+  up every 10 lines and gravity grows by the same factor each level (a straight line on a log scale), from
+  0.02 G at level 1 to 20 G at level 20. Lines per level and the speed curve are in ⚙ Settings → Game.
+  **Garbage** keeps 1–12 gray rows on the board, each with 1–5 holes at random columns. Cleared rows come back
+  after the next piece that doesn't clear a line. Guideline scoring (spins, back-to-back, combos, perfect
+  clears); the best score, lines and time are kept for each setup.
+
+Every drill board is checked by a solver before you see it.
 Some queues come in an order that only works with **hold** (set how often under ⚙ Settings → Game).
 Use **Hint** to see the next placement, or **Watch solution** for an animated walkthrough.
 The walkthrough explains wall kicks and why a rotation counts as a spin.

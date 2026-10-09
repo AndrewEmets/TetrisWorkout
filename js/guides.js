@@ -94,7 +94,20 @@
       clear with the T and the second bag. Setup N means the last N + 1 pieces are yours to place.</p>`,
   };
 
+  const MARATHON = `
+    <p><b>Marathon:</b> an endless 7-bag queue. Every few lines (10 by default) the level goes up and the
+    pieces fall faster. Gravity is multiplied by the same factor each level, up to 20 G (pieces land
+    instantly). Lock delay and the speed curve are under ⚙ Settings → Game.</p>
+    <p><b>Garbage</b> keeps the chosen number of gray rows on the board. Each row has the chosen number of
+    holes at random columns. Cleared garbage rows come back from the bottom after the next piece that
+    doesn't clear a line.</p>
+    <p><b>Score</b> follows the guideline, times the level: single / double / triple / quad 100 / 300 / 500 / 800,
+    T-spins 400 – 1600, mini and other spins 100 – 400, back-to-back quads and spins ×1.5, combos
+    +50 per step, perfect clears +800 – 2000. Soft drop scores 1 per row, hard drop 2.</p>
+    <p>The game pauses while Settings, Favorites or the phone menu is open.</p>`;
+
   function forDrill(scenario, type) {
+    if (scenario === 'MA') return MARATHON;
     if (scenario === 'OP') return OPENERS[type] || '';
     if (scenario === 'PO') return (PC_OPENER[type] || '') + SCENARIOS.PC;
     return SCENARIOS[scenario] || '';
