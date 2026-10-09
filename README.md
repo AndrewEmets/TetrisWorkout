@@ -24,8 +24,11 @@ Play online at the link above, or open `index.html` locally in a browser.
   perfect clear (the kept I or T plus three pieces). Any perfect clear counts, not just the one the solver found.
 - **Openers:** TKI, DT Cannon, Hachispin, PCO and MKO. Bag orders are 7-bag sequences checked to be buildable.
   The shape is outlined on the board while you build it (toggle with **Outline** or T).
-  Only the key pieces (the spin well and its overhangs) have a fixed spot. Filler pieces can go anywhere in the
-  shape, in any order. Mirrored openers count too; ⚙ Settings → Game → Opener side picks the side that is shown.
+  Only the key pieces (the spin well and its overhangs) have a fixed spot. In the last building step, filler
+  pieces can go anywhere, as long as the spin still works (for TKI: fill the two rows the TSD clears). In earlier
+  steps the next bag builds on the exact shape, so fillers have to fill it, in any arrangement and order.
+  After every piece a solver checks that the opener can still be finished, on either side; you only fail when
+  it can't. Mirrored openers always count; ⚙ Settings → Game → Opener side picks the side that is shown.
 
 Every board is checked by a solver before you see it.
 Some queues come in an order that only works with **hold** (set how often under ⚙ Settings → Game).

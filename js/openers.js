@@ -15,8 +15,10 @@ TW.module(function (TW) {
 
   // rows: top to bottom, aligned to the floor. X = already on the board.
   //   Uppercase letter: key piece (the spin well, overhangs); it must go exactly there.
-  //   Lowercase letter: filler, shown at a suggested spot. Filler pieces may go anywhere inside the filler
-  //   zone (lowercase cells plus '+' cells), in any order; the finisher checks that the result works.
+  //   Lowercase letter: filler, shown at a suggested spot. Fillers can be placed in any order.
+  // In the last building phase (only the spin finisher follows) fillers can go anywhere: the player only has to
+  // keep the spin possible, e.g. fill the rows a TSD clears. In earlier phases the next phase builds on the
+  // exact shape, so fillers must cover the lowercase cells, in any arrangement.
   const OPENERS = {
     tki: {
       name: 'TKI',
@@ -26,7 +28,7 @@ TW.module(function (TW) {
           label: 'Build the TKI shape, then T-Spin Double',
           bag: ALL,
           rows: [
-            '......+j++',
+            '.......j..',
             'L..ZZ.sjjj',
             'L...ZZssoo',
             'LL.IIIIsoo',
@@ -177,16 +179,26 @@ TW.module(function (TW) {
     return Math.random() < 0.5 ? 'n' : 'm';
   }
 
-  // Phase k: key targets (type -> { cells, key }), suggested filler spots (type -> cells) and the filler zone.
+  // Phase k, computed once per opener and side:
+  //   targets: key pieces (type -> { cells, key }); suggest: filler types -> suggested cells;
+  //   free: fillers may go anywhere (last building phase with a spin finisher), otherwise they must fill `zone`;
+  //   top: highest row fillers may use; slot: the finisher's cells, which must stay empty;
+  //   need: cells the finisher's line clear needs filled (used to prune the solver).
+  const shapeCache = new WeakMap();
   function phaseShape(op, k) {
+    if (!shapeCache.has(op)) shapeCache.set(op, []);
+    const cache = shapeCache.get(op);
+    if (cache[k]) return cache[k];
     const ph = op.phases[k];
-    const targets = new Map(), suggest = new Map(), zone = new Set();
-    if (ph) {
-      const top = H - ph.rows.length;
+    const targets = new Map(), suggest = new Map(), zone = new Set(), slot = new Set(), need = new Set();
+    let free = false, top = 0;
+    if (ph && ph.rows.length) {
+      top = H - ph.rows.length;
+      const full = new TW.Board();
       ph.rows.forEach((row, i) => {
         for (let x = 0; x < W; x++) {
           const ch = row[x], up = ch.toUpperCase(), y = top + i;
-          if (ch === '+') zone.add(y * W + x);
+          if (ch !== '.') full.set(x, y, 1);
           if (!TYPES.includes(up)) continue;
           const map = ch === up ? targets : suggest;
           if (!map.has(up)) map.set(up, []);
@@ -194,9 +206,26 @@ TW.module(function (TW) {
           if (ch !== up) zone.add(y * W + x);
         }
       });
+      const f = ph.finisher;
+      free = !!(f && !f.pc) && op.phases.slice(k + 1).every((p) => !p.rows.length);
+      if (free) {
+        // The finisher's slot in the finished shape (only when there is exactly one).
+        const goal = { kind: 'spin', ...f };
+        const hits = TW.Search.search(full, f.piece).placements.filter((p) => TW.Generator.goalMatches(goal, p.type, p.spin, p.lines));
+        if (new Set(hits.map((p) => cellKey(cellsOf(p)))).size === 1) {
+          const cells = cellsOf(hits[0]);
+          for (const [x, y] of cells) slot.add(y * W + x);
+          const b = full.clone();
+          b.place(hits[0]);
+          for (const y of new Set(cells.map((c) => c[1]))) {
+            if (b.rowFull(y)) for (let x = 0; x < W; x++) if (!slot.has(y * W + x)) need.add(y * W + x);
+          }
+        }
+        top = Math.max(0, top - 2); // a little room above the shape
+      }
     }
     for (const [t, cells] of targets) targets.set(t, { cells, key: cellKey(cells) });
-    return { targets, suggest, zone };
+    return (cache[k] = { targets, suggest, zone, free, top, slot, need });
   }
 
   function finisherText(f) { return f ? f.text : ''; }
@@ -237,12 +266,15 @@ TW.module(function (TW) {
     return true;
   }
 
-  // Progress through an opener: phase k, key pieces still to place, filler types still to place (with their
-  // suggested spots), the filler zone, and the lines left for a perfect clear finisher.
+  // Progress through an opener: phase k, key pieces still to place, filler types still to place, the phase's
+  // shape (see phaseShape), and the lines left for a perfect clear finisher.
   function initState(op, k) {
     const ph = op.phases[k];
-    const { targets, suggest, zone } = phaseShape(op, k);
-    return { k, targets, fillers: new Set(suggest.keys()), suggest, zone, pcLeft: ph && ph.finisher && ph.finisher.pc ? ph.finisher.pc : 0 };
+    const shape = phaseShape(op, k);
+    return {
+      k, shape, targets: new Map(shape.targets), fillers: new Set(shape.suggest.keys()), suggest: shape.suggest,
+      pcLeft: ph && ph.finisher && ph.finisher.pc ? ph.finisher.pc : 0,
+    };
   }
 
   function copyState(st) {
@@ -250,7 +282,25 @@ TW.module(function (TW) {
   }
 
   const building = (st) => st.targets.size > 0 || st.fillers.size > 0;
-  const inZone = (st, cells) => cells.every(([x, y]) => st.zone.has(y * W + x));
+  // Why a filler can't go there, or null.
+  function fillerError(op, st, type, cells) {
+    const sh = st.shape;
+    if (!sh.free) return cells.every(([x, y]) => sh.zone.has(y * W + x)) ? null : 'That ' + type + ' is outside the ' + op.name + ' shape';
+    if (cells.some(([x, y]) => sh.slot.has(y * W + x))) return 'That ' + type + ' fills the ' + op.phases[st.k].finisher.text + ' slot';
+    if (cells.some((c) => c[1] < sh.top)) return 'That ' + type + ' is too high for ' + op.name;
+    return null;
+  }
+
+  // Can the remaining fillers still fill the cells the finisher's line clear needs?
+  function needsCoverable(st, board) {
+    const sh = st.shape;
+    if (!sh.need.size) return true;
+    const keyCells = new Set();
+    for (const t of st.targets.values()) for (const [x, y] of t.cells) keyCells.add(y * W + x);
+    let open = 0;
+    for (const i of sh.need) if (!board.get(i % W, Math.floor(i / W)) && !keyCells.has(i)) open++;
+    return open <= 4 * st.fillers.size;
+  }
 
   // Advances past phases that are already complete (structure placed and no finisher).
   function settle(op, st) {
@@ -269,7 +319,8 @@ TW.module(function (TW) {
         if (t.key !== cellKey(cells)) return { error: 'That ' + type + ' is not where the ' + op.name + ' shape needs it' };
         st.targets.delete(type);
       } else if (st.fillers.has(type)) {
-        if (!inZone(st, cells)) return { error: 'That ' + type + ' is outside the ' + op.name + ' shape' };
+        const err = fillerError(op, st, type, cells);
+        if (err) return { error: err };
         st.fillers.delete(type);
       } else {
         return { error: 'The ' + type + ' is not part of this ' + op.name + ' step' };
@@ -351,7 +402,7 @@ TW.module(function (TW) {
         if (!n.st.fillers.has(n.cur)) return [];
         // The suggested spot first: when it still works, the search finds a solution right away.
         const spot = cellKey(n.st.suggest.get(n.cur));
-        const out = distinct(res, (pl, cells) => pl.lines === 0 && (strict ? cellKey(cells) === spot : inZone(n.st, cells)));
+        const out = distinct(res, (pl, cells) => pl.lines === 0 && (strict ? cellKey(cells) === spot : !fillerError(op, n.st, pl.type, cells)));
         const i = out.findIndex((o) => cellKey(cellsOf(o.pl)) === spot);
         if (i > 0) out.unshift(out.splice(i, 1)[0]);
         return out;
@@ -384,6 +435,7 @@ TW.module(function (TW) {
       const key = n.st.k + '|' + [...n.st.targets.keys()].join('') + '/' + [...n.st.fillers].join('') + '|' + n.st.pcLeft +
         '|' + n.cur + n.hold + (n.holdUsed ? 1 : 0) + '|' + n.queue.join('') + '|' + boardKey(n.board);
       if (failed.has(key)) return null;
+      if (building(n.st) && !needsCoverable(n.st, n.board)) { failed.add(key); return null; }
       for (const { pl, res } of options(n)) {
         const board = n.board.clone();
         const cells = cellsOf(pl);
