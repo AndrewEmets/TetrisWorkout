@@ -14,7 +14,7 @@ Play online at the link above, or open `index.html` locally in a browser.
 ## Drills
 
 - **Spins:** T-spin Mini / Single / Double / Triple, plus S, Z, L, J and I spins (single to triple).
-  Boards come from a library of wells: named setups (TSD, TSS, TST, STSD) plus a few hundred mined ones.
+  Boards come from a library of wells: named setups (TSD, TSS, TST) plus a few hundred mined ones.
   The well is drawn in color and the rest of the stack in gray.
   **Setup pieces** (0–3) make you build the last pieces of the well yourself. Every setup piece is needed:
   the spin isn't possible before the last one is placed, or with any one of them kept in hold.

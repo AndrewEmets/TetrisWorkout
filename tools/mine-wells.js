@@ -28,7 +28,6 @@ const NAMED = [
   { name: 'TSD', piece: 'T', spin: 'full', lines: 2, rows: ['##....', '#***##', '##*###'], clear: [1, 2] },
   { name: 'TSS', piece: 'T', spin: 'full', lines: 1, rows: ['##....', '#***##', '##*###'], clear: [1] },
   { name: 'TST', piece: 'T', spin: 'full', lines: 3, rows: ['...##', '..###', '.....', '##*##', '#**##', '##*##'], clear: [3, 4, 5] },
-  { name: 'STSD', piece: 'T', spin: 'full', lines: 2, rows: ['...##', '..###', '.....', '##*##', '#**##', '##*##'], clear: [4, 5] },
 ];
 
 const key = (t) => [t.piece, t.spin, t.lines, t.rows.join('/'), t.clear.join(','), t.wall || ''].join('|');
