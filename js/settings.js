@@ -26,7 +26,7 @@
         retry: ['b8'], prev: [], skip: ['b9'], hint: [], favorite: [], target: [],
       },
       deadzone: 0.5,
-      touchSensitivity: 1, touchRotateSwap: false, touchSlideDeadzone: 1,
+      touchSensitivity: 1, touchRotateSwap: false, touchSlideDeadzone: 1, touchLockPause: true,
     },
     handling: {
       das: 10, arr: 2, dcd: 1, sdf: 6,
@@ -78,6 +78,7 @@
       { path: 'controls.touchSensitivity', label: 'Touch drag per move', hint: 'Finger travel for one column, in board cells', min: 0.5, max: 2, step: 0.1, unit: 'cells' },
       { path: 'controls.touchSlideDeadzone', label: 'Touch: sideways dead zone in soft drop', hint: 'Extra finger travel before the first sideways move while soft dropping', min: 0, max: 3, step: 0.25, unit: 'cells' },
       { path: 'controls.touchRotateSwap', label: 'Swap touch rotation (tap left = CCW, right = CW)', type: 'bool' },
+      { path: 'controls.touchLockPause', label: 'Touch: lock delay waits while a finger is down', hint: 'With gravity, a landed piece doesn\'t lock while you touch the screen, so there is time to lift the finger and tap a spin', type: 'bool' },
       { heading: 'Marathon' },
       { path: 'marathon.linesPerLevel', label: 'Lines per level', min: 1, max: 50, step: 1, unit: '' },
       { path: 'marathon.gStart', label: 'Gravity at level 1', hint: 'Cells per frame (0.0167 G = 1 row per second)', min: 0.005, max: 1, step: 0.005, unit: 'G' },

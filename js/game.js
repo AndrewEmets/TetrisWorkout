@@ -63,6 +63,7 @@
       this.hintVisible = false;
       this.stale = new Set(); // actions held from before the current piece appeared: ignored until released
       this.pieceId = 0; // counts spawned pieces (touch gestures that started before a new piece are dropped)
+      this.touching = false; // a finger is on the play area
       this.stats = loadStats();
       this.marathonStats = loadMarathon(); // best results per marathon config: { games, score, lines, time }
       this.mara = null; // marathon run in progress: level, lines, score, ...
@@ -729,7 +730,8 @@
             if (!this.stepDown()) { this.gravAcc = 0; break; }
           }
         }
-        if (this.grounded()) {
+        // A finger on the screen holds the lock delay: lifting it and tapping a rotation takes a moment.
+        if (this.grounded() && !(this.touching && this.settings.data.controls.touchLockPause)) {
           this.lockTimer += dt;
           if (this.lockTimer >= this.g.lockDelay * FRAME) this.lockPiece();
         }

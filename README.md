@@ -61,6 +61,8 @@ On a phone or tablet, play on the board area:
 - **Swipe down fast and let go:** hard drop. **Swipe up:** hold; during a sideways drag, swipe up and let go.
   Sideways drift during these swipes doesn't move the piece.
 - **Tap the left / right half of the screen:** rotate CW / CCW.
+- With gravity on, a landed piece doesn't lock while your finger is on the screen, so there is time to lift
+  it and tap a spin (lock delay starts after you lift; it can be turned off in ⚙ Settings → Game).
   ⚙ Settings → Game can swap the taps and change how far a drag moves the piece.
 
 On a phone the toolbar folds under the ☰ button; retry and next stay next to it.

@@ -48,6 +48,7 @@
         lastX: e.clientX, lastY: e.clientY, moves: [], // moves: [time, direction] of each sideways step
         piece: game.pieceId, // a new piece ends this gesture (it doesn't act on the next piece)
       };
+      game.touching = true;
     });
 
     el.addEventListener('pointermove', (e) => {
@@ -104,6 +105,7 @@
       if (!t || e.pointerId !== t.id) return;
       const g = t;
       t = null;
+      game.touching = false;
       softDrop(g, false);
       if (cancelled || g.piece !== game.pieceId) return;
       const u = unit();
