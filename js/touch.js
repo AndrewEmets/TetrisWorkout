@@ -87,6 +87,9 @@
         t.bottom = Math.max(t.bottom, y);
         if (y < t.bottom - u) { softDrop(t, false); t.top = y; }
       } else {
+        // In a sideways drag only steep downward travel counts: the finger drifting down while it moves
+        // sideways doesn't start soft drop.
+        if (t.mode === 'h' && Math.abs(ddx) >= Math.abs(ddy)) t.top = y;
         t.top = Math.min(t.top, y);
         if (y - t.top >= (t.mode === 'h' ? 1.5 : 1) * u) {
           softDrop(t, true);
