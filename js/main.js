@@ -135,16 +135,17 @@
   const $ = (id) => document.getElementById(id);
   const pct = (s, a) => (a ? s + ' / ' + a + ' (' + Math.round((100 * s) / a) + '%)' : '—');
 
+  const touchDevice = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   function keysHelp() {
     const kb = settings.data.controls.keyboard;
     const name = (a) => (kb[a][0] ? kb[a][0].replace(/^Key|^Digit/, '').replace('Arrow', '') : '—');
-    return [
+    return (touchDevice ? [TW.Touch.help(settings)] : []).concat([
       'Move: ' + name('left') + ' / ' + name('right') + '   Soft: ' + name('softDrop'),
       'Hard drop: ' + name('hardDrop') + '   Hold: ' + name('hold'),
       'Rotate: ' + name('rotCCW') + ' / ' + name('rotCW') + ' / 180: ' + name('rot180'),
       'Retry: ' + name('retry') + '   Prev / Next: ' + name('prev') + ' / ' + name('skip') + '   Hint: ' + name('hint'),
       'Favorite: ' + name('favorite') + '   Opener outline: ' + name('target'),
-    ].join('\n');
+    ]).join('\n');
   }
 
   function updateInfo() {
@@ -194,7 +195,11 @@
 
   function resize() { renderer.resize(); }
   window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(document.getElementById('stage'));
   resize();
+
+  TW.Touch.attach(document.getElementById('stage'), { game, input, settings, cell: () => renderer.c });
 
   let last = performance.now();
   // ---------- Debug panel ----------

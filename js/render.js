@@ -6,19 +6,25 @@
   const { SHAPES, COLORS, ID_TYPE, cellsOf } = TW.Pieces;
   const HIDDEN_SHOWN = 2;
   const FIRST_ROW = H - VISIBLE - HIDDEN_SHOWN;
-  const COLS = 21; // 5 (hold) + 10 (field) + 5 (next) + margins
   const ROWS = 23.5;
+  const SIDE = 4.5, SIDE_NARROW = 3; // width of the hold / next boxes, in cells
+  const cols = (side) => 2 * side + 12; // hold + field (10) + next + margins
 
   class Renderer {
     constructor(canvas) {
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       this.c = 24;
+      this.side = SIDE;
     }
 
+    // On narrow screens (phones) the hold / next boxes get thinner so the field can be bigger.
     resize() {
       const parent = this.canvas.parentElement;
-      const c = Math.max(12, Math.floor(Math.min(parent.clientWidth / COLS, parent.clientHeight / ROWS)));
+      const fit = (side) => Math.floor(Math.min(parent.clientWidth / cols(side), parent.clientHeight / ROWS));
+      this.side = fit(SIDE_NARROW) > fit(SIDE) ? SIDE_NARROW : SIDE;
+      const c = Math.max(12, fit(this.side));
+      const COLS = cols(this.side);
       const dpr = window.devicePixelRatio || 1;
       this.c = c;
       this.canvas.style.width = COLS * c + 'px';
@@ -28,7 +34,7 @@
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    get fx() { return 5.5 * this.c; }
+    get fx() { return (this.side + 1) * this.c; }
     get fy() { return 0.5 * this.c + HIDDEN_SHOWN * this.c; }
 
     cell(x, y, color, size, alpha) {
@@ -63,7 +69,7 @@
     // Piece preview centered in a box (x, y, w, h in pixels).
     mini(type, x, y, w, h, alpha) {
       const shape = SHAPES[type][0];
-      const s = this.c * 0.8;
+      const s = Math.min(this.c * 0.8, w / 4.6);
       const xs = shape.map((p) => p[0]), ys = shape.map((p) => p[1]);
       const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
       const ox = x + (w - (maxx - minx + 1) * s) / 2, oy = y + (h - (maxy - miny + 1) * s) / 2;
@@ -168,24 +174,25 @@
       // Hold.
       this.text('HOLD', 0.5 * c, 0.9 * c, c * 0.55, '#8b93a3');
       ctx.fillStyle = '#15171c';
-      ctx.fillRect(0.5 * c, 1.4 * c, 4.5 * c, 3 * c);
-      if (game.hold) this.mini(game.hold, 0.5 * c, 1.4 * c, 4.5 * c, 3 * c, game.holdUsed ? 0.35 : 1);
-      if (!game.g.hold) this.text('off', 2.75 * c, 2.9 * c, c * 0.5, '#555c69', 'center');
+      const sw = this.side * c, mid = 0.5 * c + sw / 2;
+      ctx.fillRect(0.5 * c, 1.4 * c, sw, 3 * c);
+      if (game.hold) this.mini(game.hold, 0.5 * c, 1.4 * c, sw, 3 * c, game.holdUsed ? 0.35 : 1);
+      if (!game.g.hold) this.text('off', mid, 2.9 * c, c * 0.5, '#555c69', 'center');
 
       // Next queue (the whole drill queue is finite).
       const nx = fx + W * c + 0.5 * c;
       this.text('NEXT', nx, 0.9 * c, c * 0.55, '#8b93a3');
       ctx.fillStyle = '#15171c';
       const shown = game.queue.slice(0, 6);
-      ctx.fillRect(nx, 1.4 * c, 4.5 * c, Math.max(1, shown.length) * 2.6 * c + 0.4 * c);
-      shown.forEach((t, i) => this.mini(t, nx, 1.6 * c + i * 2.6 * c, 4.5 * c, 2.4 * c));
-      if (!shown.length && game.phase === 'play') this.text('—', nx + 2.25 * c, 2.7 * c, c * 0.6, '#555c69', 'center');
+      ctx.fillRect(nx, 1.4 * c, sw, Math.max(1, shown.length) * 2.6 * c + 0.4 * c);
+      shown.forEach((t, i) => this.mini(t, nx, 1.6 * c + i * 2.6 * c, sw, 2.4 * c));
+      if (!shown.length && game.phase === 'play') this.text('—', nx + sw / 2, 2.7 * c, c * 0.6, '#555c69', 'center');
       if (game.queue.length > 6) this.text('+' + (game.queue.length - 6) + ' more', nx, 1.4 * c + 6 * 2.6 * c + 1 * c, c * 0.45, '#8b93a3');
 
       // Last clear name.
       const lc = game.lastClear;
       if (lc && lc.text && performance.now() - lc.t < 1500) {
-        this.text(lc.text, 2.75 * c, 6 * c, c * 0.5, '#e8ebf1', 'center', 700, 4.6 * c);
+        this.text(lc.text, mid, 6 * c, c * 0.5, '#e8ebf1', 'center', 700, sw + 0.1 * c);
       }
 
       // Drill goal under the field.

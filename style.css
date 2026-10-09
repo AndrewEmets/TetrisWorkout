@@ -31,6 +31,7 @@ button, select, input, textarea {
 }
 
 button { padding: 5px 12px; cursor: pointer; }
+button, select, summary { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 button:hover { border-color: #4a5060; background: #2a2e38; }
 button:disabled { opacity: 0.4; cursor: default; border-color: var(--border); background: var(--panel-2); }
 button.active { border-color: var(--accent); background: #3a2444; }
@@ -68,6 +69,7 @@ main {
   justify-content: center;
 }
 #canvas { display: block; }
+#stage { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 
 .info {
   width: 300px;
@@ -112,9 +114,15 @@ main {
 #demo-exit { margin-left: auto; }
 
 @media (max-width: 760px) {
-  main { flex-direction: column; }
-  .info { width: auto; }
-  #stage { min-height: 70vh; }
+  body { height: auto; min-height: 100%; }
+  .bar { gap: 6px 8px; padding: 6px 8px; }
+  .bar h1 { display: none; }
+  .bar .spacer { display: none; }
+  .bar button { padding: 4px 8px; }
+  main { flex-direction: column; gap: 8px; padding: 6px 8px; }
+  .info { width: auto; overflow: visible; }
+  /* The board takes the screen below the toolbar; the panels follow further down. */
+  #stage { flex: none; height: min(calc(100dvh - 120px), calc((100vw - 16px) * 23.5 / 18)); min-height: 50vh; align-items: flex-start; }
 }
 
 /* Settings modal */
@@ -195,3 +203,11 @@ button.star.on { color: #ffd75a; border-color: #8a7330; }
 .fav-card canvas { flex-shrink: 0; border: 1px solid var(--border); }
 .fav-info { flex: 1; min-width: 0; }
 .fav-title { font-weight: 600; margin-bottom: 2px; }
+
+/* Settings fields on phones (after the base .field rules so these win). */
+@media (max-width: 760px) {
+  .field { grid-template-columns: minmax(0, 1fr) auto; }
+  .field > * { min-width: 0; }
+  .field input[type="range"] { grid-column: 1 / -1; }
+  .field small { grid-column: 1 / -1; margin-top: 0; }
+}

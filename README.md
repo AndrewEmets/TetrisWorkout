@@ -38,6 +38,15 @@ The walkthrough explains wall kicks and why a rotation counts as a spin.
 
 **◀ Prev** goes back to earlier boards. **☆** saves a board to **Favorites** so you can replay it later; favorites are stored in your browser.
 
+## Touch controls
+
+On a phone or tablet, play on the board area:
+
+- **Drag left / right:** move the piece, one column per cell of finger travel.
+- **Drag down:** soft drop. **Flick down:** hard drop. **Flick up:** hold.
+- **Tap the left / right half of the screen:** rotate CW / CCW.
+  ⚙ Settings → Game can swap the taps and change how far a drag moves the piece.
+
 ## Mechanics
 
 Mechanics follow TETR.IO:

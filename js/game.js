@@ -492,6 +492,16 @@
       }
     }
 
+    // Touch drags: one column / one row per step, no DAS. In the walkthrough a sideways drag steps through it.
+    touchShift(d) {
+      if (this.phase === 'demo') this.demoStep(d);
+      else if (this.phase === 'play' && this.piece) this.move(d);
+    }
+
+    touchSoftDrop() {
+      if (this.phase === 'play' && this.piece) this.stepDown();
+    }
+
     onRelease(a) {
       if (a !== 'left' && a !== 'right') return;
       const d = a === 'left' ? -1 : 1;
