@@ -1,6 +1,7 @@
 // Touch controls on the play area:
-//   drag left / right: move one column per cell of finger travel   drag down: soft drop, one row per cell
-//   flick down (also in the middle of a sideways drag): hard drop   flick up: hold
+//   drag left / right: move one column per cell of finger travel
+//   drag down and keep the finger down: soft drop, like holding the soft drop key (move back up to stop)
+//   release during a fast downward swipe: hard drop   swipe up: hold
 //   tap left / right half of the screen: rotate CW / CCW (swappable)
 (function (TW) {
   'use strict';
@@ -9,6 +10,7 @@
   const FLICK_WINDOW = 120; // ms of finger movement a flick is measured over
   const FLICK_CELLS = 2.5; // a flick covers at least this many cells within the window...
   const FLICK_SPEED = 1.2; // ...at this speed or faster (px per ms)
+  const SRC = 'touch'; // input source id for the held soft drop
 
   // opts: { game, input, settings, cell: () => board cell size in CSS pixels }
   function attach(el, opts) {
@@ -18,8 +20,15 @@
     const unit = () => opts.cell() * settings.data.controls.touchSensitivity;
     const press = (a) => input.onPress(a);
 
-    // Fast downward movement within the last FLICK_WINDOW ms? Measured from any recent point, so a flick right
-    // after a sideways drag isn't slowed down by the sideways part.
+    function softDrop(g, on) {
+      if (g.soft === on) return;
+      g.soft = on;
+      if (on) input.press('softDrop', SRC);
+      else input.release('softDrop', SRC);
+    }
+
+    // Was the finger moving down fast when it left the screen? Measured from any point of the last
+    // FLICK_WINDOW ms, so a swipe right after a sideways drag isn't slowed down by the sideways part.
     function flicked(g, time, y) {
       while (g.trail.length > 1 && time - g.trail[0][0] > FLICK_WINDOW) g.trail.shift();
       const dist = FLICK_CELLS * unit();
@@ -30,19 +39,21 @@
       if (e.pointerType !== 'touch' || t || !input.enabled) return;
       e.preventDefault();
       try { el.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
-      t = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t0: e.timeStamp, mode: null, held: false, done: false, trail: [[e.timeStamp, e.clientY]] };
+      t = {
+        id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, top: e.clientY, bottom: e.clientY,
+        t0: e.timeStamp, mode: null, held: false, soft: false, trail: [[e.timeStamp, e.clientY]],
+      };
     });
 
     el.addEventListener('pointermove', (e) => {
       if (!t || e.pointerId !== t.id) return;
       e.preventDefault();
-      if (t.done) return; // hard dropped already: the rest of this touch is ignored
-      const u = unit();
-      t.trail.push([e.timeStamp, e.clientY]);
-      if (flicked(t, e.timeStamp, e.clientY)) { t.done = true; press('hardDrop'); return; }
-      // The first clear movement decides whether this touch moves the piece or drops / holds it.
+      const u = unit(), y = e.clientY;
+      t.trail.push([e.timeStamp, y]);
+      while (t.trail.length > 1 && e.timeStamp - t.trail[0][0] > FLICK_WINDOW) t.trail.shift();
+      // The first clear movement decides whether this touch moves the piece sideways or drops / holds it.
       if (!t.mode) {
-        const dx = e.clientX - t.x0, dy = e.clientY - t.y0;
+        const dx = e.clientX - t.x0, dy = y - t.y0;
         if (Math.max(Math.abs(dx), Math.abs(dy)) < u * 0.5) return;
         t.mode = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
       }
@@ -52,18 +63,25 @@
           t.x += d * u;
           game.touchShift(d);
         }
-      } else {
-        while (e.clientY - t.y >= u) { t.y += u; game.touchSoftDrop(); }
-        if (e.clientY < t.y) t.y = e.clientY; // moving back up restarts the soft drop distance
-        if (!t.held && e.clientY - t.y0 <= -1.5 * u) { t.held = true; press('hold'); }
       }
+      // Soft drop while the finger is held below where the downward drag started; moving back up stops it.
+      // A sideways drag needs a bit more downward travel, so small wobbles don't drop the piece.
+      if (t.soft) {
+        t.bottom = Math.max(t.bottom, y);
+        if (y < t.bottom - u) { softDrop(t, false); t.top = y; }
+      } else {
+        t.top = Math.min(t.top, y);
+        if (y - t.top >= (t.mode === 'h' ? 1.5 : 1) * u) { softDrop(t, true); t.bottom = y; }
+      }
+      if (t.mode === 'v' && !t.held && !t.soft && y - t.y0 <= -1.5 * u) { t.held = true; press('hold'); }
     });
 
     const end = (e, cancelled) => {
       if (!t || e.pointerId !== t.id) return;
       const g = t;
       t = null;
-      if (cancelled || g.done) return;
+      softDrop(g, false);
+      if (cancelled) return;
       const u = unit();
       if (!g.mode && Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < u * 0.5 && e.timeStamp - g.t0 < TAP_MS) {
         const left = e.clientX < window.innerWidth / 2;
@@ -81,7 +99,7 @@
   // Short description for the keys panel.
   function help(settings) {
     const swap = settings.data.controls.touchRotateSwap;
-    return 'Touch: drag ←/→ move · drag ↓ soft drop · flick ↓ hard drop · flick ↑ hold · tap left / right: rotate ' +
+    return 'Touch: drag ←/→ move · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop · swipe ↑ hold · tap left / right: rotate ' +
       (swap ? 'CCW / CW' : 'CW / CCW');
   }
 
