@@ -1,6 +1,7 @@
 // Touch controls on the play area:
 //   drag left / right: move one column per cell of finger travel
-//   drag down and keep the finger down: soft drop, like holding the soft drop key (move back up to stop)
+//   drag down and keep the finger down: soft drop, like holding the soft drop key (move back up to stop);
+//   dragging sideways then still moves the piece, e.g. to slide it under an overhang
 //   release during a fast downward swipe: hard drop   swipe up: hold
 //   tap left / right half of the screen: rotate CW / CCW (swappable)
 (function (TW) {
@@ -43,7 +44,7 @@
       try { el.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
       t = {
         id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, top: e.clientY, bottom: e.clientY,
-        t0: e.timeStamp, mode: null, held: false, soft: false, trail: [[e.timeStamp, e.clientY]],
+        t0: e.timeStamp, mode: null, held: false, soft: false, slide: false, trail: [[e.timeStamp, e.clientY]],
         lastX: e.clientX, lastY: e.clientY, moves: [], // moves: [time, direction] of each sideways step
       };
     });
@@ -63,7 +64,9 @@
         if (Math.max(Math.abs(dx), Math.abs(dy)) < u * 0.5) return;
         t.mode = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
       }
-      if (t.mode === 'h') {
+      // Sideways moves: in a sideways drag, and after a downward drag started soft drop (slide the piece
+      // into an overhang without lifting the finger).
+      if (t.mode === 'h' || t.slide) {
         // While the finger heads mostly down or up (into a hard drop or hold swipe), sideways drift is ignored.
         if (Math.abs(ddy) > 2 * Math.abs(ddx)) t.x += ddx;
         while (Math.abs(e.clientX - t.x) >= u) {
@@ -79,7 +82,11 @@
         if (y < t.bottom - u) { softDrop(t, false); t.top = y; }
       } else {
         t.top = Math.min(t.top, y);
-        if (y - t.top >= (t.mode === 'h' ? 1.5 : 1) * u) { softDrop(t, true); t.bottom = y; }
+        if (y - t.top >= (t.mode === 'h' ? 1.5 : 1) * u) {
+          softDrop(t, true);
+          t.bottom = y;
+          if (!t.slide) { t.slide = true; t.x = e.clientX; }
+        }
       }
       if (t.mode === 'v' && !t.held && !t.soft && y - t.y0 <= -1.5 * u) { t.held = true; press('hold'); }
     });
