@@ -27,12 +27,14 @@
       else input.release('softDrop', SRC);
     }
 
-    // Was the finger moving down fast when it left the screen? Measured from any point of the last
-    // FLICK_WINDOW ms, so a swipe right after a sideways drag isn't slowed down by the sideways part.
-    function flicked(g, time, y) {
+    // Was the finger moving down fast when it left the screen? Returns when that swipe started, or null.
+    // Measured from any point of the last FLICK_WINDOW ms, so a swipe right after a sideways drag isn't
+    // slowed down by the sideways part.
+    function flickStart(g, time, y) {
       while (g.trail.length > 1 && time - g.trail[0][0] > FLICK_WINDOW) g.trail.shift();
       const dist = FLICK_CELLS * unit();
-      return g.trail.some(([t1, y1]) => y - y1 >= dist && (y - y1) / Math.max(1, time - t1) >= FLICK_SPEED);
+      const p = g.trail.find(([t1, y1]) => y - y1 >= dist && (y - y1) / Math.max(1, time - t1) >= FLICK_SPEED);
+      return p ? p[0] : null;
     }
 
     el.addEventListener('pointerdown', (e) => {
@@ -42,6 +44,7 @@
       t = {
         id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, top: e.clientY, bottom: e.clientY,
         t0: e.timeStamp, mode: null, held: false, soft: false, trail: [[e.timeStamp, e.clientY]],
+        lastX: e.clientX, lastY: e.clientY, moves: [], // moves: [time, direction] of each sideways step
       };
     });
 
@@ -49,6 +52,9 @@
       if (!t || e.pointerId !== t.id) return;
       e.preventDefault();
       const u = unit(), y = e.clientY;
+      const ddx = e.clientX - t.lastX, ddy = y - t.lastY;
+      t.lastX = e.clientX;
+      t.lastY = y;
       t.trail.push([e.timeStamp, y]);
       while (t.trail.length > 1 && e.timeStamp - t.trail[0][0] > FLICK_WINDOW) t.trail.shift();
       // The first clear movement decides whether this touch moves the piece sideways or drops / holds it.
@@ -58,10 +64,12 @@
         t.mode = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
       }
       if (t.mode === 'h') {
+        // While the finger heads mostly downward (e.g. into a hard drop swipe), sideways drift is ignored.
+        if (ddy > 0 && ddy > 2 * Math.abs(ddx)) t.x += ddx;
         while (Math.abs(e.clientX - t.x) >= u) {
           const d = Math.sign(e.clientX - t.x);
           t.x += d * u;
-          game.touchShift(d);
+          if (game.touchShift(d)) t.moves.push([e.timeStamp, d]);
         }
       }
       // Soft drop while the finger is held below where the downward drag started; moving back up stops it.
@@ -88,7 +96,14 @@
         press(left !== settings.data.controls.touchRotateSwap ? 'rotCW' : 'rotCCW');
         return;
       }
-      if (flicked(g, e.timeStamp, e.clientY)) press('hardDrop');
+      const start = flickStart(g, e.timeStamp, e.clientY);
+      if (start === null) return;
+      // Undo sideways steps made during the swipe itself, so a slanted swipe drops where it started.
+      for (const [time, d] of g.moves.slice().reverse()) {
+        if (time < start) break;
+        if (!game.touchShift(-d)) break;
+      }
+      press('hardDrop');
     };
     el.addEventListener('pointerup', (e) => end(e, false));
     el.addEventListener('pointercancel', (e) => end(e, true));

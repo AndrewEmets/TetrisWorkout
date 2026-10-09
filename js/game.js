@@ -493,9 +493,10 @@
     }
 
     // Touch drags: one column per step, no DAS. In the walkthrough a sideways drag steps through it.
+    // Returns whether the piece moved.
     touchShift(d) {
-      if (this.phase === 'demo') this.demoStep(d);
-      else if (this.phase === 'play' && this.piece) this.move(d);
+      if (this.phase === 'demo') { this.demoStep(d); return false; }
+      return this.phase === 'play' && !!this.piece && this.move(d);
     }
 
     onRelease(a) {
