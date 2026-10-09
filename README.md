@@ -19,8 +19,13 @@ Play online at the link above, or open `index.html` locally in a browser.
   **Setup pieces** (0–3) make you build the last pieces of the well yourself. Every setup piece is needed:
   the spin isn't possible before the last one is placed, or with any one of them kept in hold.
 - **Perfect clear:** 2-line or 4-line, with 2–8 pieces.
+- **PC openers:** PCO and MKO. The first-bag shape is already built; finish the second-bag perfect clear.
+  **Setup pieces** (0–3) set how many pieces are yours to place: 0 means only the last piece, 3 the whole
+  perfect clear (the kept I or T plus three pieces). Any perfect clear counts, not just the one the solver found.
 - **Openers:** TKI, DT Cannon, Hachispin, PCO and MKO. Bag orders are 7-bag sequences checked to be buildable.
-  The shape is outlined on the board while you build it.
+  The shape is outlined on the board while you build it (toggle with **Outline** or T).
+  Only the key pieces (the spin well and its overhangs) have a fixed spot. Filler pieces can go anywhere in the
+  shape, in any order. Mirrored openers count too; ⚙ Settings → Game → Opener side picks the side that is shown.
 
 Every board is checked by a solver before you see it.
 Some queues come in an order that only works with **hold** (set how often under ⚙ Settings → Game).

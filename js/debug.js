@@ -70,7 +70,7 @@
   }
 
   // Generates n drills for every scenario/type/setup combination and replays their solutions.
-  // opts.shuffle: chance (%) of queues that need hold, opts.only: scenario keys to test.
+  // opts.shuffle: chance (%) of queues that need hold, opts.only: scenario keys to test, opts.side: opener side.
   function selfTest(n, setups, opts) {
     n = n || 3;
     setups = setups || [0, 1, 2, 3];
@@ -84,7 +84,7 @@
           const errors = [];
           for (let i = 0; i < n; i++) {
             const t0 = performance.now();
-            const d = TW.Generator.generate(sc, type, setup, { hold: true, shuffle: opts.shuffle || 0 });
+            const d = TW.Generator.generate(sc, type, setup, { hold: true, shuffle: opts.shuffle || 0, side: opts.side });
             ms += performance.now() - t0;
             if (!d) { gen++; continue; }
             if (d.well) tpl++;
@@ -134,7 +134,7 @@
     const lines = [];
     lines.push('Tetris Workout — ' + d.goal.text + (d.setup ? ' (setup ' + d.setup + ')' : ''));
     lines.push('drill: ' + JSON.stringify({ scenario: d.scenario, type: d.type, setup: d.setup, well: d.well ? d.well.id : undefined, needsHold: d.needsHold || undefined }));
-    if (d.opener) lines.push('opener step: ' + (game.op ? game.op.k + 1 : '?') + ' / ' + d.opener.phases.length);
+    if (d.opener) lines.push('opener step: ' + (game.op ? game.op.k + 1 : '?') + ' / ' + d.opener.phases.length + (game.opener && game.opener.mirrored ? ' (mirrored)' : ''));
     lines.push('', 'Start board (queue ' + d.queue.join('') + '):');
     lines.push(...d.board.toLetterRows());
     lines.push('', 'Now (phase ' + game.phase + (game.flash ? ', "' + game.flash.text + (game.flash.sub ? ': ' + game.flash.sub : '') + '"' : '') + '):');

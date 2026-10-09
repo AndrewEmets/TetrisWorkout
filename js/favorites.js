@@ -4,7 +4,7 @@
 
   const STORAGE_KEY = 'tetris-workout-favorites';
 
-  const signature = (d) => [d.scenario, d.type, d.setup, d.queue.join(''), d.board.toLetterRows().join('/')].join('|');
+  const signature = (d) => [d.scenario, d.type, d.setup, d.queue.join(''), d.board.toLetterRows().join('/')].join('|') + (d.side === 'm' ? '|m' : '');
 
   function serialize(d) {
     return {
@@ -18,6 +18,7 @@
       solution: d.solution,
       well: d.well || null,
       needsHold: !!d.needsHold,
+      side: d.side || 'n',
     };
   }
 
@@ -30,7 +31,8 @@
       scenario: f.scenario, type: f.type, setup: f.setup,
       well: f.well || null,
       needsHold: !!f.needsHold,
-      opener: f.scenario === 'OP' ? TW.Openers.OPENERS[f.type] : null,
+      side: f.side || 'n',
+      opener: f.scenario === 'OP' ? TW.Openers.get(f.type, f.side) : null,
     };
   }
 
@@ -70,7 +72,7 @@
 
   // Mini board preview. Opener favorites start empty, so they show the opener's first shape dimmed.
   function drawThumb(canvas, f) {
-    const opener = f.scenario === 'OP' && TW.Openers.OPENERS[f.type];
+    const opener = f.scenario === 'OP' && TW.Openers.get(f.type, f.side);
     const rows = (opener ? opener.phases[0].rows : f.rows).slice(-10);
     const c = 9, n = 10;
     const dpr = window.devicePixelRatio || 1;
@@ -86,8 +88,8 @@
     const top = n - rows.length;
     rows.forEach((row, i) => {
       for (let x = 0; x < 10; x++) {
-        const ch = row[x];
-        if (ch === '.') continue;
+        const ch = row[x].toUpperCase();
+        if (ch === '.' || ch === '+') continue;
         ctx.fillStyle = TW.Pieces.COLORS[ch === '#' || ch === 'X' ? 8 : ch] || TW.Pieces.COLORS[8];
         ctx.fillRect(x * c, (top + i) * c, c - 1, c - 1);
       }

@@ -56,7 +56,8 @@
 
     spec() {
       const s = this.settings.data.drill;
-      return { scenario: s.scenario, type: s.type, setup: s.setup, hold: this.g.hold, shuffle: this.g.hold ? this.g.holdShuffle : 0 };
+      const side = s.scenario === 'OP' || s.scenario === 'PO' ? this.g.openerSide : null;
+      return { scenario: s.scenario, type: s.type, setup: s.setup, hold: this.g.hold, shuffle: this.g.hold ? this.g.holdShuffle : 0, side };
     }
 
     // Starts generating the next drill for the current selection (unless already ready or running).
@@ -151,7 +152,12 @@
     startAttempt() {
       if (!this.drill) return;
       this.demo = null;
-      this.op = this.drill.opener ? TW.Openers.settle(this.drill.opener, TW.Openers.initState(this.drill.opener, 0)) : null;
+      // Openers count on either side: one progress state per side that still fits, the drill's own side first.
+      const d = this.drill;
+      this.ops = d.opener
+        ? [d.opener, TW.Openers.get(d.type, d.side === 'm' ? 'n' : 'm')].map((op) => ({ op, st: TW.Openers.settle(op, TW.Openers.initState(op, 0)) }))
+        : null;
+      this.hintCache = null;
       this.board = this.drill.board.clone();
       this.queue = this.drill.queue.slice();
       this.hold = null;
@@ -167,7 +173,7 @@
     // Debug: play a custom board with the currently selected drill goal.
     loadCustom(board, queue) {
       const s = this.settings.data.drill;
-      const opener = s.scenario === 'OP' ? TW.Openers.OPENERS[s.type] : null;
+      const opener = s.scenario === 'OP' ? TW.Openers.get(s.type, 'n') : null;
       const goal = opener ? { kind: 'opener', text: opener.name } : TW.Generator.makeGoal(s.scenario, s.type);
       this.genToken++;
       this.setDrill({ board, queue, solution: [], goal, opener, scenario: s.scenario, type: s.type, setup: s.setup });
@@ -346,19 +352,33 @@
       this.spawnNext();
     }
 
+    // Current opener progress (the first side that still fits) and its opener.
+    get op() { return this.ops && this.ops.length ? this.ops[0].st : null; }
+    get opener() { return this.ops && this.ops.length ? this.ops[0].op : this.drill && this.drill.opener; }
+
     openerLock(p, cells, spin, lines, name) {
-      const op = this.drill.opener;
-      const r = TW.Openers.applyLock(op, this.op, this.board, p.type, cells, spin, lines);
-      if (r.error) return this.fail(r.error);
-      if (r.done) return this.success(name || op.name, op.name + ' complete!');
-      // Fail early when the remaining pieces can no longer finish the opener (small search budget).
+      const name0 = this.ops[0].op.name;
+      const live = [];
+      let error = null;
+      for (const side of this.ops) {
+        const st = TW.Openers.copyState(side.st);
+        const r = TW.Openers.applyLock(side.op, st, this.board, p.type, cells, spin, lines);
+        if (r.error) { error = error || r.error; continue; }
+        if (r.done) return this.success(name || name0, name0 + ' complete!');
+        live.push({ op: side.op, st });
+      }
+      if (!live.length) return this.fail(error);
+      this.ops = live;
+      // Fail early when the remaining pieces can no longer finish the opener on any side (small search budget).
       let queue = this.queue.slice(), hold = this.hold, cur = null;
       if (queue.length) cur = queue.shift();
       else if (hold) { cur = hold; hold = null; }
       if (!cur) return this.fail('Out of pieces');
-      const st = { k: this.op.k, targets: new Map(this.op.targets), pcLeft: this.op.pcLeft };
-      const res = TW.Openers.solve(op, { board: this.board, st, cur, queue, hold, holdUsed: false }, { budget: 400, hold: this.g.hold });
-      if (res.ok === false) return this.fail('The remaining pieces can\'t finish ' + op.name + ' from here');
+      // Quick check with fillers on their suggested spots, then a small flexible search.
+      const solve = (side, strict, budget) => TW.Openers.solve(side.op,
+        { board: this.board, st: TW.Openers.copyState(side.st), cur, queue, hold, holdUsed: false }, { budget, strict, hold: this.g.hold }).ok;
+      const possible = live.some((side) => solve(side, true, 400)) || live.some((side) => solve(side, false, 150) !== false);
+      if (!possible) return this.fail('The remaining pieces can\'t finish ' + name0 + ' from here');
       this.spawnNext();
     }
 
@@ -411,9 +431,21 @@
     hint() {
       if (!this.hintVisible || !this.drill || this.phase !== 'play') return null;
       const sol = this.drill.placements;
-      if (this.locks >= sol.length) return null;
-      if (!this.board.equals(this.drill.expected[this.locks])) return { offScript: true };
-      return sol[this.locks];
+      if (this.locks < sol.length && this.board.equals(this.drill.expected[this.locks])) return sol[this.locks];
+      if (!this.ops || !this.ops.length || !this.piece) return this.locks >= sol.length ? null : { offScript: true };
+      // Opener off the recorded solution (fillers can go anywhere): solve again from here.
+      const key = this.locks + '|' + this.piece.type + '|' + this.hold + '|' + this.holdUsed;
+      if (!this.hintCache || this.hintCache.key !== key) {
+        const { op, st } = this.ops[0];
+        const solve = (strict, budget) => TW.Openers.solve(op, {
+          board: this.board, st: TW.Openers.copyState(st), cur: this.piece.type, queue: this.queue.slice(), hold: this.hold, holdUsed: this.holdUsed,
+        }, { budget, strict, hold: this.g.hold });
+        let res = solve(true, 400);
+        if (!res.ok) res = solve(false, 1500);
+        const step = res.ok && res.actions.find((a) => !a.hold);
+        this.hintCache = { key, hint: step || { offScript: true } };
+      }
+      return this.hintCache.hint;
     }
 
     // ---------- Input ----------

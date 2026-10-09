@@ -81,8 +81,22 @@
       </ul>`,
   };
 
+  // PC Opener drills: the first bag is already built; finish the second-bag perfect clear.
+  const PC_OPENER = {
+    pco: `
+      <p>The <b>PCO</b> shape from the first bag is already built, and the <b>I</b> was kept. The second-bag
+      perfect clear fills the 4-row hole in the middle. Setup N means the last N + 1 pieces of the
+      perfect clear are yours to place.</p>
+      <p>The usual solutions put the I <b>vertically</b>, flat in the <b>1st row</b>, or flat in the <b>3rd row</b>.
+      The cell under the Z overhang has to be filled with a tuck or a spin.</p>`,
+    mko: `
+      <p>The <b>MKO</b> shape from the first bag is already built, and the <b>T</b> was kept. Finish the perfect
+      clear with the T and the second bag. Setup N means the last N + 1 pieces are yours to place.</p>`,
+  };
+
   function forDrill(scenario, type) {
     if (scenario === 'OP') return OPENERS[type] || '';
+    if (scenario === 'PO') return (PC_OPENER[type] || '') + SCENARIOS.PC;
     return SCENARIOS[scenario] || '';
   }
 

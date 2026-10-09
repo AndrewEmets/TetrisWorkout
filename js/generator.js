@@ -34,6 +34,7 @@ TW.module(function (TW) {
     const sc = SCENARIOS[scenario];
     const t = sc.types.find((x) => x[0] === type) || sc.types[0];
     if (scenario === 'PC') return { kind: 'pc', height: t[2], text: 'Perfect Clear (' + t[1] + ')' };
+    if (scenario === 'PO') return { kind: 'pc', height: 4, text: 'Perfect Clear (' + t[1] + ')' };
     const spin = scenario === 'T' ? (t[0] === 'mini' ? 'mini' : 'full') : 'any';
     const text = (spin === 'mini' ? 'Mini ' : '') + sc.piece + '-Spin ' + TW.Spin.LINE_NAMES[t[2]].toLowerCase().replace(/^./, (c) => c.toUpperCase());
     return { kind: 'spin', piece: sc.piece, spin, lines: t[2], text };
@@ -517,12 +518,18 @@ TW.module(function (TW) {
   }
 
   // Returns a drill { board, queue, solution, goal, scenario, type, setup } or null.
-  // opts: hold (hold allowed), shuffle (chance in % of a queue order that needs hold).
+  // opts: hold (hold allowed), shuffle (chance in % of a queue order that needs hold),
+  // side (openers: 'normal' | 'mirrored' | 'random').
   function generate(scenario, type, setup, opts) {
-    if (scenario === 'OP') return TW.Openers.generate(type, !opts || opts.hold !== false);
-    const goal = makeGoal(scenario, type);
+    opts = opts || {};
+    const side = TW.Openers.pickSide(opts.side);
+    if (scenario === 'OP') return TW.Openers.generate(type, opts.hold !== false, side);
+    let goal = makeGoal(scenario, type);
     let drill;
-    if (goal.kind === 'pc') {
+    if (scenario === 'PO') {
+      drill = TW.Openers.genPCOpener(type, Math.min(setup, MAX_SETUP.po), side);
+      if (drill) goal = drill.goal;
+    } else if (goal.kind === 'pc') {
       const n = Math.min(setup, MAX_SETUP.pc);
       drill = genPC(goal, 2 + n);
     } else {
@@ -530,8 +537,8 @@ TW.module(function (TW) {
       drill = genFromTemplate(goal, n) || genSpin(goal, n);
     }
     if (!drill) return null;
-    const hold = !opts || opts.hold !== false;
-    if (hold && opts && opts.shuffle > 0 && Math.random() * 100 < opts.shuffle) holdShuffle(drill, goal);
+    const hold = opts.hold !== false;
+    if (hold && opts.shuffle > 0 && Math.random() * 100 < opts.shuffle) holdShuffle(drill, goal);
     return Object.assign(drill, { goal, scenario, type, setup });
   }
 

@@ -1,18 +1,22 @@
 // Opener drills. Shapes come from four.lol (decoded fumen diagrams). An opener is a list of phases:
-// each phase builds a fixed structure (one piece per letter) and then optionally finishes with a spin
+// each phase builds a structure (one piece per letter) and then optionally finishes with a spin
 // or a perfect clear. Queues are 7-bag orders that a solver has verified can build the opener.
+// Every opener can also be played mirrored.
 TW.module(function (TW) {
   'use strict';
 
   const { W, H } = TW.Board;
-  const { TYPES, cellsOf } = TW.Pieces;
+  const { TYPES, TYPE_ID, cellsOf } = TW.Pieces;
   const ALL = TYPES;
 
   const TSS = { piece: 'T', spin: 'full', lines: 1, text: 'T-Spin Single' };
   const TSD = { piece: 'T', spin: 'full', lines: 2, text: 'T-Spin Double' };
   const TST = { piece: 'T', spin: 'full', lines: 3, text: 'T-Spin Triple' };
 
-  // rows: top to bottom, aligned to the floor. Letters = pieces placed in this phase, X = already on the board.
+  // rows: top to bottom, aligned to the floor. X = already on the board.
+  //   Uppercase letter: key piece (the spin well, overhangs); it must go exactly there.
+  //   Lowercase letter: filler, shown at a suggested spot. Filler pieces may go anywhere inside the filler
+  //   zone (lowercase cells plus '+' cells), in any order; the finisher checks that the result works.
   const OPENERS = {
     tki: {
       name: 'TKI',
@@ -22,10 +26,10 @@ TW.module(function (TW) {
           label: 'Build the TKI shape, then T-Spin Double',
           bag: ALL,
           rows: [
-            '.......J..',
-            'L..ZZ.SJJJ',
-            'L...ZZSSOO',
-            'LL.IIIISOO',
+            '......+j++',
+            'L..ZZ.sjjj',
+            'L...ZZssoo',
+            'LL.IIIIsoo',
           ],
           finisher: TSD,
         },
@@ -39,22 +43,22 @@ TW.module(function (TW) {
           label: 'Bag 1: build the base',
           bag: ALL,
           rows: [
-            '....T.....',
-            '...TTTI...',
-            '....SSIZZ.',
-            'OO.SSLIJZZ',
-            'OO.LLLIJJJ',
+            '....t.....',
+            '...ttti...',
+            '....ssizz.',
+            'oo.sslijzz',
+            'oo.lllijjj',
           ],
         },
         {
           label: 'Bag 2: build the cannon, then T-Spin Double',
           bag: ALL,
           rows: [
-            '..LL....SS',
-            '...LZZ.SSI',
-            'JJ.LXZZOOI',
-            'J..XXXXOOI',
-            'J...XXXXXI',
+            '..LL....ss',
+            '...LZZ.ssi',
+            'JJ.LXZZooi',
+            'J..XXXXooi',
+            'J...XXXXXi',
             'XX.XXXXXXX',
             'XX.XXXXXXX',
           ],
@@ -77,10 +81,10 @@ TW.module(function (TW) {
           bag: ALL,
           rows: [
             '......Z...',
-            'I....ZZ...',
-            'I.JJJZ....',
-            'ILLLJOO.SS',
-            'IL...OOSS.',
+            'i....ZZ...',
+            'i.JJJZ....',
+            'iLLLJoo.ss',
+            'iL...ooss.',
           ],
           finisher: TSS,
         },
@@ -88,12 +92,12 @@ TW.module(function (TW) {
           label: 'Bag 2: build the TST slot, then T-Spin Triple',
           bag: ALL,
           rows: [
-            'JJ.....I..',
-            'J....SSIOO',
-            'J.ZZSSXIOO',
-            'X..ZZXXILL',
-            'X.XXXXXXXL',
-            'XX...XXXXL',
+            'JJ.....i..',
+            'J....SSioo',
+            'J.ZZSSXioo',
+            'X..ZZXXill',
+            'X.XXXXXXXl',
+            'XX...XXXXl',
           ],
           finisher: TST,
         },
@@ -107,10 +111,10 @@ TW.module(function (TW) {
           label: 'Bag 1: build the PCO shape (keep the I)',
           bag: ALL,
           rows: [
-            'LLL.....SS',
-            'LOO....SST',
-            'JOO...ZZTT',
-            'JJJ....ZZT',
+            'lll.....ss',
+            'loo....sst',
+            'joo...zztt',
+            'jjj....zzt',
           ],
         },
         {
@@ -129,10 +133,10 @@ TW.module(function (TW) {
           label: 'Bag 1: build the MKO shape (keep the T)',
           bag: ALL,
           rows: [
-            'S.....Z..I',
-            'SS...ZZ..I',
-            'JS...ZLOOI',
-            'JJJ.LLLOOI',
+            's.....z..i',
+            'ss...zz..i',
+            'js...zlooi',
+            'jjj.lllooi',
           ],
         },
         {
@@ -149,22 +153,50 @@ TW.module(function (TW) {
 
   const cellKey = (cells) => cells.map(([x, y]) => y * W + x).sort((a, b) => a - b).join(',');
 
-  // Map type -> { key, cells } of the pieces placed in phase k (absolute board coordinates).
-  function phaseTargets(op, k) {
-    const ph = op.phases[k];
-    const targets = new Map();
-    if (!ph) return targets;
-    const top = H - ph.rows.length;
-    ph.rows.forEach((row, i) => {
-      for (let x = 0; x < W; x++) {
-        const ch = row[x];
-        if (!TYPES.includes(ch)) continue;
-        if (!targets.has(ch)) targets.set(ch, { cells: [] });
-        targets.get(ch).cells.push([x, top + i]);
-      }
+  // Mirrored opener: rows reversed, S <-> Z and L <-> J (both cases).
+  const SWAP = { S: 'Z', Z: 'S', L: 'J', J: 'L', s: 'z', z: 's', l: 'j', j: 'l' };
+  function mirrorOpener(op) {
+    return Object.assign({}, op, {
+      mirrored: true,
+      phases: op.phases.map((ph) => Object.assign({}, ph, {
+        rows: ph.rows.map((r) => r.split('').reverse().map((c) => SWAP[c] || c).join('')),
+      })),
     });
-    for (const t of targets.values()) t.key = cellKey(t.cells);
-    return targets;
+  }
+  const mirrors = {};
+  // side: 'n' (as on four.lol) or 'm' (mirrored).
+  function get(id, side) {
+    const op = OPENERS[id];
+    if (!op || side !== 'm') return op;
+    return mirrors[id] || (mirrors[id] = mirrorOpener(op));
+  }
+  // Setting value ('normal' | 'mirrored' | 'random') -> side.
+  function pickSide(pref) {
+    if (pref === 'normal') return 'n';
+    if (pref === 'mirrored') return 'm';
+    return Math.random() < 0.5 ? 'n' : 'm';
+  }
+
+  // Phase k: key targets (type -> { cells, key }), suggested filler spots (type -> cells) and the filler zone.
+  function phaseShape(op, k) {
+    const ph = op.phases[k];
+    const targets = new Map(), suggest = new Map(), zone = new Set();
+    if (ph) {
+      const top = H - ph.rows.length;
+      ph.rows.forEach((row, i) => {
+        for (let x = 0; x < W; x++) {
+          const ch = row[x], up = ch.toUpperCase(), y = top + i;
+          if (ch === '+') zone.add(y * W + x);
+          if (!TYPES.includes(up)) continue;
+          const map = ch === up ? targets : suggest;
+          if (!map.has(up)) map.set(up, []);
+          map.get(up).push([x, y]);
+          if (ch !== up) zone.add(y * W + x);
+        }
+      });
+    }
+    for (const [t, cells] of targets) targets.set(t, { cells, key: cellKey(cells) });
+    return { targets, suggest, zone };
   }
 
   function finisherText(f) { return f ? f.text : ''; }
@@ -205,14 +237,24 @@ TW.module(function (TW) {
     return true;
   }
 
+  // Progress through an opener: phase k, key pieces still to place, filler types still to place (with their
+  // suggested spots), the filler zone, and the lines left for a perfect clear finisher.
   function initState(op, k) {
     const ph = op.phases[k];
-    return { k, targets: phaseTargets(op, k), pcLeft: ph && ph.finisher && ph.finisher.pc ? ph.finisher.pc : 0 };
+    const { targets, suggest, zone } = phaseShape(op, k);
+    return { k, targets, fillers: new Set(suggest.keys()), suggest, zone, pcLeft: ph && ph.finisher && ph.finisher.pc ? ph.finisher.pc : 0 };
   }
+
+  function copyState(st) {
+    return Object.assign({}, st, { targets: new Map(st.targets), fillers: new Set(st.fillers) });
+  }
+
+  const building = (st) => st.targets.size > 0 || st.fillers.size > 0;
+  const inZone = (st, cells) => cells.every(([x, y]) => st.zone.has(y * W + x));
 
   // Advances past phases that are already complete (structure placed and no finisher).
   function settle(op, st) {
-    while (st.k < op.phases.length && st.targets.size === 0 && !op.phases[st.k].finisher) {
+    while (st.k < op.phases.length && !building(st) && !op.phases[st.k].finisher) {
       Object.assign(st, initState(op, st.k + 1));
     }
     return st;
@@ -221,11 +263,18 @@ TW.module(function (TW) {
   // Applies a lock to opener progress. Returns { error } | { done } | {} and mutates st.
   function applyLock(op, st, board, type, cells, spin, lines) {
     const ph = op.phases[st.k];
-    if (st.targets.size) {
+    if (building(st)) {
       const t = st.targets.get(type);
-      if (!t || t.key !== cellKey(cells)) return { error: 'That ' + type + ' is not part of the ' + op.name + ' shape' };
+      if (t) {
+        if (t.key !== cellKey(cells)) return { error: 'That ' + type + ' is not where the ' + op.name + ' shape needs it' };
+        st.targets.delete(type);
+      } else if (st.fillers.has(type)) {
+        if (!inZone(st, cells)) return { error: 'That ' + type + ' is outside the ' + op.name + ' shape' };
+        st.fillers.delete(type);
+      } else {
+        return { error: 'The ' + type + ' is not part of this ' + op.name + ' step' };
+      }
       if (lines) return { error: 'Unexpected line clear' };
-      st.targets.delete(type);
     } else if (ph.finisher && ph.finisher.pc) {
       st.pcLeft -= lines;
       if (!board.isEmpty()) {
@@ -248,11 +297,23 @@ TW.module(function (TW) {
 
   const BUDGET = {};
 
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   // Depth-first search for a way to finish the opener from `init`:
   // { board, st, cur, queue (pieces after cur), hold, holdUsed }. Returns { ok, actions } (ok null = budget hit).
+  // opts: budget, hold (allowed), random (try placements in random order), strict (fillers only on their
+  // suggested spots: much faster, used to verify generated queues).
   function solve(op, init, opts) {
     const budget = (opts && opts.budget) || 20000;
     const allowHold = !opts || opts.hold !== false;
+    const random = !!(opts && opts.random);
+    const strict = !!(opts && opts.strict);
     const failed = new Set();
     const cache = new Map();
     let nodes = 0;
@@ -264,30 +325,45 @@ TW.module(function (TW) {
       return r;
     };
 
+    // Placements with distinct cells that pass `keep`.
+    function distinct(res, keep) {
+      const out = [];
+      const seen = new Set();
+      for (const pl of res.placements) {
+        const cells = cellsOf(pl);
+        const k = cellKey(cells);
+        if (seen.has(k) || !keep(pl, cells)) continue;
+        seen.add(k);
+        out.push({ pl, res });
+      }
+      return random ? shuffle(out) : out;
+    }
+
     function options(n) {
       const ph = op.phases[n.st.k];
       const res = search(n.board, n.cur);
-      if (n.st.targets.size) {
+      if (building(n.st)) {
         const t = n.st.targets.get(n.cur);
-        if (!t) return [];
-        const pl = res.placements.find((p) => p.lines === 0 && cellKey(cellsOf(p)) === t.key);
-        return pl ? [{ pl, res }] : [];
+        if (t) {
+          const pl = res.placements.find((p) => p.lines === 0 && cellKey(cellsOf(p)) === t.key);
+          return pl ? [{ pl, res }] : [];
+        }
+        if (!n.st.fillers.has(n.cur)) return [];
+        // The suggested spot first: when it still works, the search finds a solution right away.
+        const spot = cellKey(n.st.suggest.get(n.cur));
+        const out = distinct(res, (pl, cells) => pl.lines === 0 && (strict ? cellKey(cells) === spot : inZone(n.st, cells)));
+        const i = out.findIndex((o) => cellKey(cellsOf(o.pl)) === spot);
+        if (i > 0) out.unshift(out.splice(i, 1)[0]);
+        return out;
       }
       const f = ph.finisher;
       if (f.pc) {
-        const out = [];
-        const seen = new Set();
-        for (const pl of res.placements) {
-          const k = cellKey(cellsOf(pl));
-          if (seen.has(k)) continue;
-          seen.add(k);
+        return distinct(res, (pl) => {
           const b = n.board.clone();
           b.place(pl);
           const lines = b.clearLines();
-          if (!b.isEmpty() && !pcPrune(b, n.st.pcLeft - lines)) continue;
-          out.push({ pl, res });
-        }
-        return out;
+          return b.isEmpty() || pcPrune(b, n.st.pcLeft - lines);
+        });
       }
       if (n.cur !== f.piece) return [];
       const pl = res.placements.find((p) => TW.Generator.goalMatches({ kind: 'spin', ...f }, p.type, p.spin, p.lines));
@@ -305,19 +381,21 @@ TW.module(function (TW) {
       if (n.st.k >= op.phases.length) return [];
       if (!n.cur) return null;
       if (++nodes > budget) throw BUDGET;
-      const key = n.st.k + '|' + [...n.st.targets.keys()].join('') + '|' + n.st.pcLeft + '|' + n.cur + n.hold + (n.holdUsed ? 1 : 0) + '|' + n.queue.join('') + '|' + boardKey(n.board);
+      const key = n.st.k + '|' + [...n.st.targets.keys()].join('') + '/' + [...n.st.fillers].join('') + '|' + n.st.pcLeft +
+        '|' + n.cur + n.hold + (n.holdUsed ? 1 : 0) + '|' + n.queue.join('') + '|' + boardKey(n.board);
       if (failed.has(key)) return null;
       for (const { pl, res } of options(n)) {
         const board = n.board.clone();
         const cells = cellsOf(pl);
         board.place(pl);
         const lines = board.clearLines();
-        const st = { k: n.st.k, targets: new Map(n.st.targets), pcLeft: n.st.pcLeft };
+        const st = copyState(n.st);
         const r = applyLock(op, st, board, pl.type, cells, pl.spin, lines);
         if (r.error) continue;
-        if (r.done) return [{ type: pl.type, rot: pl.rot, x: pl.x, y: pl.y, path: res.pathTo(pl) }];
+        const step = { type: pl.type, rot: pl.rot, x: pl.x, y: pl.y, path: res.pathTo(pl) };
+        if (r.done) return [step];
         const rest = dfs(next(n, board, st, n.hold));
-        if (rest) return [{ type: pl.type, rot: pl.rot, x: pl.x, y: pl.y, path: res.pathTo(pl) }, ...rest];
+        if (rest) return [step, ...rest];
       }
       if (allowHold && !n.holdUsed) {
         let h;
@@ -341,22 +419,14 @@ TW.module(function (TW) {
     }
   }
 
-  function shuffle(a) {
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
-  // Returns a drill with a solvable 7-bag queue, or null.
-  function generate(id, allowHold) {
-    const op = OPENERS[id];
+  // Returns a drill with a solvable 7-bag queue, or null. side: 'n' | 'm'.
+  function generate(id, allowHold, side) {
+    const op = get(id, side);
     if (!op) return null;
     for (let attempt = 0; attempt < 300; attempt++) {
       const queue = [].concat(...op.phases.map((ph) => shuffle(ph.bag.slice())));
       const st = settle(op, initState(op, 0));
-      const r = solve(op, { board: new TW.Board(), st, cur: queue[0], queue: queue.slice(1), hold: null, holdUsed: false }, { budget: 6000, hold: allowHold });
+      const r = solve(op, { board: new TW.Board(), st, cur: queue[0], queue: queue.slice(1), hold: null, holdUsed: false }, { budget: 6000, hold: allowHold, strict: true });
       if (!r.ok) continue;
       return {
         board: new TW.Board(),
@@ -364,6 +434,7 @@ TW.module(function (TW) {
         solution: r.actions,
         goal: { kind: 'opener', text: op.name },
         opener: op,
+        side: op.mirrored ? 'm' : 'n',
         scenario: 'OP',
         type: id,
         setup: 0,
@@ -373,8 +444,58 @@ TW.module(function (TW) {
     return null;
   }
 
+  // ---------- Perfect clear openers ----------
+
+  const PC_OPENERS = ['pco', 'mko'];
+
+  // The finished first-bag shape, then the last setupN + 1 pieces of a second-bag perfect clear to place.
+  // The solver picks the solution from a random second bag, so all the usual solutions come up.
+  function genPCOpener(id, setupN, side) {
+    const op = get(id, side);
+    if (!op) return null;
+    const k = op.phases.findIndex((ph) => ph.finisher && ph.finisher.pc);
+    const shape = op.phases[0];
+    const board = new TW.Board();
+    const top = H - shape.rows.length;
+    const used = new Set();
+    shape.rows.forEach((row, i) => {
+      for (let x = 0; x < W; x++) {
+        const t = row[x].toUpperCase();
+        if (TYPE_ID[t]) { board.set(x, top + i, TYPE_ID[t]); used.add(t); }
+      }
+    });
+    const kept = TYPES.filter((t) => !used.has(t)); // held through the first bag
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const queue = kept.concat(shuffle(TYPES.slice()));
+      const st = initState(op, k);
+      const r = solve(op, { board, st, cur: queue[0], queue: queue.slice(1), hold: null, holdUsed: false }, { budget: 3000, hold: true, random: true });
+      if (!r.ok) continue;
+      const steps = r.actions.filter((a) => !a.hold);
+      const pre = steps.length - (setupN + 1);
+      if (pre < 0) continue;
+      const b = board.clone();
+      let height = st.pcLeft;
+      for (const s of steps.slice(0, pre)) { b.place(s); height -= b.clearLines(); }
+      const rest = steps.slice(pre);
+      return {
+        board: b,
+        queue: rest.map((s) => s.type),
+        solution: rest,
+        goal: { kind: 'pc', height, text: 'Perfect Clear (' + op.name + ')' },
+        well: { id: id + (op.mirrored ? '-m' : ''), name: op.name + (op.mirrored ? ' (mirrored)' : '') },
+        side: op.mirrored ? 'm' : 'n',
+        attempts: attempt + 1,
+      };
+    }
+    return null;
+  }
+
+  TW.Generator.SCENARIOS.PO = { label: 'PC Opener', types: PC_OPENERS.map((id) => [id, OPENERS[id].name]) };
   TW.Generator.SCENARIOS.OP = { label: 'Opener', types: Object.entries(OPENERS).map(([id, o]) => [id, o.name]) };
   TW.Generator.MAX_SETUP.op = 0;
+  TW.Generator.MAX_SETUP.po = 3;
 
-  TW.Openers = { OPENERS, phaseTargets, initState, settle, applyLock, solve, generate, cellKey, finisherText };
+  TW.Openers = {
+    OPENERS, get, pickSide, initState, copyState, settle, applyLock, solve, generate, genPCOpener, cellKey, finisherText,
+  };
 });

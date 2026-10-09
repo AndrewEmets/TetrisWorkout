@@ -17,6 +17,7 @@
   const gamePress = input.onPress;
   input.onPress = (a) => {
     if (a === 'favorite') { if (game.drill) TW.Favorites.toggle(game.drill); }
+    else if (a === 'target') settings.set('game.showTarget', !settings.data.game.showTarget);
     else gamePress(a);
   };
   TW.Favorites.onChange(() => { game.changed = true; });
@@ -51,7 +52,7 @@
     if (!SCENARIOS[d.scenario]) d.scenario = 'T';
     const sc = SCENARIOS[d.scenario];
     if (!sc.types.some((t) => t[0] === d.type)) d.type = sc.types[0][0];
-    const max = d.scenario === 'PC' ? MAX_SETUP.pc : d.scenario === 'OP' ? 0 : MAX_SETUP.spin;
+    const max = d.scenario === 'PC' ? MAX_SETUP.pc : d.scenario === 'OP' ? 0 : d.scenario === 'PO' ? MAX_SETUP.po : MAX_SETUP.spin;
     d.setup = Math.min(Math.max(0, d.setup | 0), max);
 
     selScenario.value = d.scenario;
@@ -71,7 +72,7 @@
   function renderGuide() {
     const d = settings.data.drill;
     let html = TW.Guides.forDrill(d.scenario, d.type);
-    const op = d.scenario === 'OP' && TW.Openers.OPENERS[d.type];
+    const op = (d.scenario === 'OP' || d.scenario === 'PO') && TW.Openers.OPENERS[d.type];
     if (op) html += '<p class="muted">Shapes from <a href="' + op.source + '" target="_blank" rel="noopener">four.lol</a>.</p>';
     document.getElementById('guide-text').innerHTML = html;
   }
@@ -111,6 +112,7 @@
   blurAfter('btn-new', () => game.onPress('skip'));
   blurAfter('btn-retry', () => game.onPress('retry'));
   blurAfter('btn-hint', () => game.onPress('hint'));
+  blurAfter('btn-target', () => input.onPress('target'));
   blurAfter('btn-copy', () => {
     const text = TW.debug.describe(game);
     const btn = document.getElementById('btn-copy');
@@ -141,7 +143,7 @@
       'Hard drop: ' + name('hardDrop') + '   Hold: ' + name('hold'),
       'Rotate: ' + name('rotCCW') + ' / ' + name('rotCW') + ' / 180: ' + name('rot180'),
       'Retry: ' + name('retry') + '   Prev / Next: ' + name('prev') + ' / ' + name('skip') + '   Hint: ' + name('hint'),
-      'Favorite: ' + name('favorite'),
+      'Favorite: ' + name('favorite') + '   Opener outline: ' + name('target'),
     ].join('\n');
   }
 
@@ -151,10 +153,13 @@
     $('goal-text').textContent = d ? d.goal.text : '—';
     let detail = '';
     if (d) {
-      if (d.opener) {
-        const k = Math.min(game.op ? game.op.k : 0, d.opener.phases.length - 1);
-        detail = 'Step ' + (k + 1) + ' of ' + d.opener.phases.length + ': ' + d.opener.phases[k].label + '.';
-      } else if (d.goal.kind === 'pc') detail = 'Clear the whole board using ' + d.queue.length + ' pieces. Stay under the dashed line.';
+      const op = game.opener;
+      if (op) {
+        const k = Math.min(game.op ? game.op.k : 0, op.phases.length - 1);
+        detail = 'Step ' + (k + 1) + ' of ' + op.phases.length + ': ' + op.phases[k].label + '.';
+        if (op.mirrored) detail += ' (Mirrored.)';
+        if (k === 0 && game.ops && game.ops.length > 1) detail += ' Either side counts.';
+      } else if (d.goal.kind === 'pc') detail = 'Clear the whole board using ' + d.queue.length + ' piece' + (d.queue.length > 1 ? 's' : '') + '. Stay under the dashed line.';
       else if (d.setup) detail = 'Place ' + d.setup + ' setup piece' + (d.setup > 1 ? 's' : '') + ' first, then spin the ' + d.goal.piece + '.';
       else detail = 'Spin the ' + d.goal.piece + ' into the slot.';
       if (d.well && d.well.name) detail = 'Setup: ' + d.well.name + '. ' + detail;
@@ -168,6 +173,7 @@
     $('st-best').textContent = st.best;
     $('keys-help').textContent = keysHelp();
     $('btn-hint').classList.toggle('active', game.hintVisible);
+    $('btn-target').classList.toggle('active', settings.data.game.showTarget);
     $('btn-prev').disabled = !game.hasPrev();
     const fav = TW.Favorites.has(d);
     $('btn-fav').textContent = fav ? '★' : '☆';
@@ -210,7 +216,7 @@
     const p = game.pending;
     $('dbg-next').textContent = !p ? '—' : p.drill === undefined ? 'generating…' : p.drill ? 'ready (' + Math.round(p.drill.genMs || 0) + ' ms)' : 'failed';
     $('dbg-where').textContent = game.gen.background ? 'background worker' : 'main thread';
-    $('dbg-well').textContent = !d || d.goal.kind !== 'spin' ? '—' : d.well ? d.well.id : 'procedural';
+    $('dbg-well').textContent = !d ? '—' : d.well ? d.well.id : d.goal.kind === 'spin' ? 'procedural' : '—';
   }
 
   function frame(now) {

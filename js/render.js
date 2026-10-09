@@ -117,10 +117,15 @@
         ctx.restore();
       }
 
-      // Opener: remaining cells of the current phase's shape.
-      if (game.op && game.g.showTarget && game.phase === 'play') {
-        for (const [t, tg] of game.op.targets) {
-          for (const [x, y] of tg.cells) if (!b.get(x, y)) this.fieldCell(x, y, COLORS[t], 0.16);
+      // Opener: remaining cells of the current phase's shape. Key pieces are brighter than the suggested
+      // filler spots (fillers may go anywhere in the shape).
+      const op = game.op;
+      if (op && game.g.showTarget && game.phase === 'play') {
+        for (const [t, tg] of op.targets) {
+          for (const [x, y] of tg.cells) if (!b.get(x, y)) this.fieldCell(x, y, COLORS[t], 0.18);
+        }
+        for (const t of op.fillers) {
+          for (const [x, y] of op.suggest.get(t)) if (!b.get(x, y)) this.fieldCell(x, y, COLORS[t], 0.09);
         }
       }
 

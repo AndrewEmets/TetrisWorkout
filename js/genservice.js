@@ -10,7 +10,7 @@
       let drill = null, error = null;
       const t0 = performance.now();
       try {
-        drill = TW.Generator.generate(spec.scenario, spec.type, spec.setup, { hold: spec.hold, shuffle: spec.shuffle });
+        drill = TW.Generator.generate(spec.scenario, spec.type, spec.setup, { hold: spec.hold, shuffle: spec.shuffle, side: spec.side });
         if (drill) drill.genMs = performance.now() - t0;
       } catch (err) {
         error = String(err && err.stack || err);
@@ -23,11 +23,11 @@
   function revive(d) {
     if (!d) return null;
     d.board = new TW.Board(Uint8Array.from(d.board));
-    if (d.scenario === 'OP') d.opener = TW.Openers.OPENERS[d.type];
+    if (d.scenario === 'OP') d.opener = TW.Openers.get(d.type, d.side);
     return d;
   }
 
-  const keyOf = (spec) => [spec.scenario, spec.type, spec.setup, spec.hold, spec.shuffle].join('|');
+  const keyOf = (spec) => [spec.scenario, spec.type, spec.setup, spec.hold, spec.shuffle, spec.side].join('|');
 
   class GenService {
     constructor() {
@@ -70,7 +70,7 @@
         if (this.job !== job) return;
         this.job = null;
         const t0 = performance.now();
-        const d = TW.Generator.generate(job.spec.scenario, job.spec.type, job.spec.setup, { hold: job.spec.hold, shuffle: job.spec.shuffle });
+        const d = TW.Generator.generate(job.spec.scenario, job.spec.type, job.spec.setup, { hold: job.spec.hold, shuffle: job.spec.shuffle, side: job.spec.side });
         if (d) d.genMs = performance.now() - t0;
         job.resolve(d);
       }, 20);
