@@ -53,7 +53,10 @@ The walkthrough explains wall kicks and why a rotation counts as a spin.
 
 On a phone or tablet, play on the board area:
 
-- **Drag left / right:** move the piece, one column per cell of finger travel.
+- **Drag left / right:** move the piece. Slow drags take more finger travel per column (1.5 cells), so short
+  moves are easy to stop on the right column; fast drags take less (0.6 cells), to cross the board quickly.
+  On Android each step also gives a short vibration. Optionally a fast sideways flick, released mid-motion,
+  sends the piece to the wall. All of it is adjustable in ⚙ Settings → Game.
 - **Drag down and keep the finger down:** soft drop, like holding the soft drop key; move back up to stop.
   It also works in the middle of a sideways drag, and sideways drags keep moving the piece while it soft
   drops, so you can slide it under an overhang without lifting the finger. The first sideways step there needs
