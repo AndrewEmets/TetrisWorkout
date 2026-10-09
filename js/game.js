@@ -764,11 +764,11 @@
     }
   }
 
-  // Marathon gravity for a level: logarithmic, so it rises quickly over the first levels and then levels off,
-  // from gStart at level 1 to gTop at topLevel, then stays at gTop.
+  // Marathon gravity for a level: multiplied by the same factor every level, from gStart at level 1 to gMax
+  // at maxLevel (a straight line on a log scale), then stays at gMax.
   Game.levelGravity = (m, level) => {
-    const t = Math.min(1, Math.log(Math.max(1, level)) / Math.log(Math.max(2, m.topLevel)));
-    return m.gStart + (m.gTop - m.gStart) * t;
+    const t = Math.min(1, (level - 1) / Math.max(1, m.maxLevel - 1));
+    return Math.min(m.gMax, m.gStart * Math.pow(Math.max(m.gMax, m.gStart) / m.gStart, t));
   };
 
   Game.FRAME = FRAME;

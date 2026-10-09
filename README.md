@@ -36,8 +36,8 @@ options. Each mode remembers its last selection.
   outline switches to the side you are building.
 
 - **Marathon:** an endless 7-bag game for 150 or 300 lines, or endless, from a chosen start level. The level goes
-  up every 10 lines. Gravity is logarithmic in the level: it rises quickly over the first levels and then levels
-  off, from 0.02 G at level 1 to 1 G at level 20. Lines per level and the speed curve are in ⚙ Settings → Game.
+  up every 10 lines and gravity grows by the same factor each level (a straight line on a log scale), from
+  0.02 G at level 1 to 20 G at level 20. Lines per level and the speed curve are in ⚙ Settings → Game.
   **Garbage** keeps 1–12 gray rows on the board, each with 1–5 holes at random columns. Cleared rows come back
   after the next piece that doesn't clear a line. Guideline scoring (spins, back-to-back, combos, perfect
   clears); the best score, lines and time are kept for each setup.
