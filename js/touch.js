@@ -1,10 +1,50 @@
-// Touch controls on the play area:
-//   drag left / right: move the piece; slow drags need more finger travel per column (precise), fast ones less
-//   drag down and keep the finger down: soft drop, like holding the soft drop key (move back up to stop);
-//   dragging sideways then still moves the piece, e.g. to slide it under an overhang
-//   release during a fast downward swipe: hard drop   swipe up: hold
-//   release during a fast sideways flick: piece to the wall (optional)
-//   tap left / right half of the screen: rotate CW / CCW (swappable)
+// Touch controls on the play area (#stage: the whole screen under the toolbar on phones).
+//
+// One finger at a time. Every touch is one gesture: it can move the piece sideways, soft drop it, hold it,
+// rotate it (a tap) and finally hard drop it (a fast swipe at release). Distances are in board cells (u = one
+// cell in CSS px), so the feel is the same on every screen size.
+//
+// 1. Tap: lift within TAP_MS without moving 0.5 cells -> rotate. Left half of the screen CW, right half CCW
+//    (swappable). Rotation happens on release, since only then is it clear the touch wasn't a drag.
+//
+// 2. Direction lock: the first 0.5 cells of travel decide the gesture's mode.
+//    'h' (mostly sideways): a sideways drag. It can still turn into soft drop, hold or hard drop later.
+//    'v' (mostly vertical): a drop / hold gesture. Sideways moves start only once soft drop is on (see 4).
+//
+// 3. Sideways moves. The finger's travel is scaled by its speed (gain) into vx; each time vx is one column
+//    (touchSlow cells) away from the last step's anchor x, the piece moves one column. Slow drags take
+//    1.5 cells per column, fast ones 0.6 (touchFast at touchFastSpeed), blended in between: careful short
+//    moves land on the right column, a quick sweep crosses the board.
+//    Going back the other way takes only REVERSE_CELLS (hysteresis): an overshoot is fixed with a small
+//    move back, and a finger resting near a column edge doesn't make the piece jitter.
+//    Movements that are mostly vertical (|dy| > 2|dx|) don't count, so sideways drift during a drop or
+//    hold swipe doesn't move the piece. Each step vibrates on Android (touchVibrate).
+//    e.g. drag 3 cells right slowly -> 2 columns; then 0.5 cells back -> 1 column back.
+//    e.g. sweep 2 cells left in 50 ms -> 3 columns.
+//
+// 4. Soft drop: held while the finger stays below the point where the downward drag started, like holding
+//    the soft drop key; moving the finger up one cell from its lowest point stops it. It starts after 1 cell
+//    of downward travel ('v'), or 1.5 cells of steep downward travel in a sideways drag (drift during a
+//    sideways drag resets the count, so a slanted drag doesn't start it).
+//    While soft drop is on, sideways moves work too (slide a piece under an overhang without lifting the
+//    finger); in a 'v' gesture the first such step needs touchSlideDeadzone extra cells.
+//    e.g. drag down 3 cells and keep the finger there -> the piece falls at soft drop speed until you lift.
+//    e.g. drag down to the floor, then right 2 cells -> the piece slides right under a roof.
+//
+// 5. Hold: a 'v' gesture going 1.5 cells up holds at once. In a sideways drag, a fast upward flick at
+//    release holds (so an upward wobble mid-drag doesn't).
+//
+// 6. Release: lifting the finger during a fast swipe -
+//    down (FLICK_CELLS within FLICK_WINDOW at FLICK_SPEED or faster) -> hard drop. Sideways steps made during
+//      that swipe are undone first, so a slanted swipe drops where the swipe started;
+//    up -> hold (see 5);
+//    sideways, with touchWallFlick on -> the piece goes all the way to the wall.
+//    A slow lift does nothing more: the piece stays where the drag left it.
+//    e.g. drag right 2 columns, then swipe down and let go -> hard drop 2 columns to the right.
+//
+// 7. New piece: a gesture that started before the current piece appeared (the last one locked or was held)
+//    is ignored until the finger lifts, so a swipe can't also hard drop the next piece. While a finger is
+//    down, the game's lock delay waits (game.touching), so there is time to lift and tap a spin.
 (function (TW) {
   'use strict';
 
@@ -14,6 +54,7 @@
   const FLICK_SPEED = 1.2; // ...at this speed or faster (px per ms)
   const WALL_CELLS = 2; // a sideways flick to the wall covers this many cells within the window, at FLICK_SPEED
   const SPEED_WINDOW = 60; // ms the sideways finger speed is measured over
+  const REVERSE_CELLS = 0.5; // finger travel back (at slow speed) that undoes the last sideways step
   const SRC = 'touch'; // input source id for the held soft drop
 
   // opts: { game, input, settings, cell: () => board cell size in CSS pixels }
@@ -71,8 +112,9 @@
       try { el.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
       t = {
         id: e.pointerId, x0: e.clientX, y0: e.clientY, top: e.clientY, bottom: e.clientY,
-        // vx: finger x with the speed-dependent gain applied; x: where the last sideways step happened (same scale)
-        vx: e.clientX, x: e.clientX,
+        // vx: finger x with the speed-dependent gain applied; x: where the last sideways step happened (same
+        // scale); dir: direction of that step (0 before the first one)
+        vx: e.clientX, x: e.clientX, dir: 0,
         t0: e.timeStamp, mode: null, held: false, soft: false, slide: false, dead: 0, trail: [[e.timeStamp, e.clientY, e.clientX]],
         lastX: e.clientX, lastY: e.clientY, moves: [], // moves: [time, direction] of each sideways step
         piece: game.pieceId, // a new piece ends this gesture (it doesn't act on the next piece)
@@ -109,10 +151,14 @@
           const speed = Math.abs(e.clientX - p[2]) / Math.max(8, e.timeStamp - p[0]) * 1000 / u; // cells per second
           const slow = cfg().touchSlow * u;
           t.vx += ddx * slow / stepPx(speed, u);
-          // During soft drop the first sideways step needs extra travel (dead zone), against accidental moves.
-          while (Math.abs(t.vx - t.x) >= slow + t.dead) {
+          // A step needs one column of travel; going back the other way needs only REVERSE_CELLS. During soft
+          // drop the first step needs extra travel (dead zone), against accidental moves.
+          for (;;) {
             const d = Math.sign(t.vx - t.x);
-            t.x += d * (slow + t.dead);
+            const need = d === -t.dir ? REVERSE_CELLS * u : slow + t.dead;
+            if (!d || Math.abs(t.vx - t.x) < need) break;
+            t.x += d * need;
+            t.dir = d;
             t.dead = 0;
             if (game.touchShift(d)) { t.moves.push([e.timeStamp, d]); buzz(); }
           }
@@ -134,6 +180,7 @@
           if (!t.slide) {
             t.slide = true;
             t.x = t.vx;
+            t.dir = 0;
             if (t.mode === 'v') t.dead = cfg().touchSlideDeadzone * u;
           }
         }
