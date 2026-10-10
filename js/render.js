@@ -276,9 +276,25 @@
       ctx.globalAlpha = 1;
     }
 
-    outline(cells, color, dashed) {
+    // A small label in a dark pill (pixels: center x, y).
+    badge(str, x, y) {
+      const ctx = this.ctx, c = this.c, size = c * 0.55;
+      ctx.font = '800 ' + Math.round(size) + 'px system-ui, "Segoe UI", sans-serif';
+      const w = ctx.measureText(str).width + size * 0.8, h = size * 1.3;
+      x = Math.min(Math.max(x, this.fx + w / 2), this.fx + W * c - w / 2);
+      ctx.fillStyle = 'rgba(8,9,12,0.85)';
+      roundRect(ctx, x - w / 2, y - h / 2, w, h, h / 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffd75a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(str, x, y + size * 0.05);
+    }
+
+    outline(cells, color, dashed, alpha) {
       const ctx = this.ctx, c = this.c;
       ctx.save();
+      if (alpha != null) ctx.globalAlpha = alpha;
       ctx.strokeStyle = color;
       ctx.lineWidth = Math.max(2, c * 0.1);
       if (dashed) ctx.setLineDash([c * 0.25, c * 0.15]);
@@ -366,10 +382,31 @@
 
       // Hint.
       const hint = game.hint();
+      let badge = null;
       if (hint && hint.offScript) {
         this.text('Off script — press Retry', fx + W * c / 2, fy + c, c * 0.6, '#ffd75a', 'center');
       } else if (hint) {
-        this.outline(cellsOf(hint), COLORS[hint.type], true);
+        // Spins and tucks: the spot to rotate from, with the rotation to do; the final spot fainter.
+        const setup = game.hintSetup(hint);
+        this.outline(cellsOf(hint), COLORS[hint.type], true, setup ? 0.5 : 1);
+        this.center(hint, hint.y, setup ? 0.5 : 1);
+        if (setup) {
+          const sp = setup.piece;
+          for (const [x, y] of cellsOf(sp)) {
+            ctx.fillStyle = COLORS[sp.type];
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(fx + x * c, this.rowY(y), c, c);
+            ctx.globalAlpha = 1;
+          }
+          this.outline(cellsOf(sp), COLORS[sp.type], false);
+          this.center(sp, sp.y, 1);
+          const top = Math.min(...cellsOf(sp).map(([, y]) => y));
+          const n = sp.type === 'I' ? 4 : 3;
+          badge = {
+            text: setup.rotations.map((r) => ({ CW: '↻', CCW: '↺', 180: '180°' }[r])).join(' '),
+            x: fx + (sp.type === 'O' ? sp.x + 2 : sp.x + n / 2) * c, y: this.rowY(top) - 0.45 * c,
+          };
+        }
       }
 
       // Ghost and active piece.
@@ -386,6 +423,7 @@
           this.center(p, p.y, 1);
         }
       }
+      if (badge) this.badge(badge.text, badge.x, badge.y);
       this.drawFlashes(now);
       this.drawParticles(dt);
 

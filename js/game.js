@@ -684,6 +684,33 @@
       return this.hintCache.hint;
     }
 
+    // Where the hint's piece has to be before its last rotation(s): { piece, rotations: ['CW', ...] }, or null when
+    // the solution doesn't end by rotating into place (then the drop itself is the hint). Replays the step's path
+    // on the current board (the hint only shows while the board matches it) and caches the result on the step.
+    hintSetup(step) {
+      if (step.setup !== undefined) return step.setup;
+      step.setup = null;
+      const path = step.path || [];
+      const ROT = ['CW', 'CCW', '180'];
+      let last = path.length - 1;
+      if (path[last] === 'HD') last--;
+      let first = last + 1;
+      while (first > 0 && ROT.includes(path[first - 1])) first--;
+      let p = TW.Search.spawnPiece(this.board, step.type);
+      if (!p || first > last) return null;
+      let before = null;
+      for (let i = 0; i <= last; i++) {
+        if (i === first) before = { ...p };
+        const r = TW.Search.applyOp(this.board, p, path[i]);
+        if (!r) return null;
+        p = r.piece;
+      }
+      // Rotating in the air and then dropping: the rotation spot doesn't matter.
+      if (p.x !== step.x || p.y !== step.y || p.rot !== step.rot) return null;
+      step.setup = { piece: before, rotations: path.slice(first, last + 1) };
+      return step.setup;
+    }
+
     // ---------- Input ----------
 
     onPress(a) {

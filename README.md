@@ -47,7 +47,8 @@ options. Each mode remembers its last selection.
 
 Every drill board is checked by a solver before you see it.
 Some queues come in an order that only works with **hold** (set how often under ⚙ Settings → Game).
-Use **Hint** to see the next placement, or **Watch solution** for an animated walkthrough.
+Use **Hint** to see the next placement (for a spin, the spot to rotate from and the rotation to do, with the
+final spot fainter), or **Watch solution** for an animated walkthrough.
 The walkthrough explains wall kicks and why a rotation counts as a spin.
 
 **◀ Prev** goes back to earlier boards. **☆** saves a board to **Favorites** so you can replay it later; favorites are stored in your browser.
