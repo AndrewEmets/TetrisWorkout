@@ -331,6 +331,7 @@
     // Vibrates for a piece action (touch devices, when enabled in Settings -> Touch).
     haptic(kind, lines) {
       if (!CAN_VIBRATE || !this.settings.data.controls.touchVibrate) return;
+      if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; // blocked before the first tap
       let p = HAPTICS[kind];
       if (kind === 'clear') p = [].concat(...Array.from({ length: lines }, (_, i) => (i ? [40, 30] : [30])));
       try { navigator.vibrate(p); } catch (e) { /* not allowed yet */ }
@@ -393,6 +394,14 @@
       if (moved) this.spin = 'none';
       if (this.mara) this.mara.score += 2 * moved;
       this.lockPiece(true);
+    }
+
+    // Sonic drop: straight to the floor without locking (lock delay and lock resets work as after a soft drop).
+    sonicDrop() {
+      let rows = 0;
+      while (this.stepDown()) rows++;
+      this.softAcc = 0;
+      if (this.mara) this.mara.score += rows;
     }
 
     lockPiece(hard) {
@@ -681,6 +690,7 @@
         case 'rot180': this.rotate(2); break;
         case 'hold': this.doHold(); break;
         case 'hardDrop': if (performance.now() >= this.guardUntil) this.hardDrop(); break;
+        case 'sonicDrop': this.sonicDrop(); break;
         case 'softDrop':
           this.haptic('soft');
           if (this.h.sdf >= 41) while (this.stepDown());

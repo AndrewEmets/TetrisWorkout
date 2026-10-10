@@ -62,6 +62,8 @@ On a phone or tablet, play on the board area:
   pauses the drop (moving down again resumes it), so the piece never falls diagonally and you can slide it
   under an overhang without lifting the finger. The first sideways step there needs a little extra travel
   (a dead zone, adjustable in ⚙ Settings → Touch) so the piece doesn't shift by accident.
+- **Swipe down fast and keep the finger down:** sonic drop. The piece falls straight to the floor but doesn't
+  lock, so you can still slide or spin it (with gravity on it locks after the lock delay, once you lift).
 - **Swipe down fast and let go:** hard drop. **Swipe up:** hold; after a sideways drag, swipe up and let go.
   Each movement counts only along its own direction (sideways, down or up, within 35°), so drift during a
   swipe doesn't move the piece and a diagonal drag does nothing.

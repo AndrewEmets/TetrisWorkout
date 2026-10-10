@@ -20,6 +20,10 @@
 //     lowest point. After a sideways pause, moving down again resumes it.
 //     e.g. drag down 3 cells and keep the finger there -> the piece falls at soft drop speed until you lift.
 //     e.g. drag down to the floor, then right -> the piece slides along the floor under a roof.
+//     A fast swipe down (as for hard drop) with the finger kept on the screen is a sonic drop (touchSonic): the
+//     piece falls straight to the floor without locking, once per downward stroke. Letting go during the swipe
+//     still hard drops (see below).
+//     e.g. swipe down fast and keep the finger there -> the piece is on the floor; slide or tap to spin it.
 //   up -> hold, after HOLD_CELLS cells up in a gesture that hasn't moved or dropped the piece yet.
 //   diagonal -> nothing: a slanted drag neither moves nor drops the piece.
 //
@@ -99,6 +103,7 @@
       this.softOn = false;
       this.bottom = y;
       this.held = false;
+      this.sonic = false; // this downward stroke has sonic dropped
     }
 
     get stale() { return this.piece !== this.env.pieceId(); }
@@ -123,6 +128,11 @@
       }
       if (dir === 'side') this.sideways(time, x, dx);
       this.vertical(dir, y, dy);
+      if (dir === 'up' || dir === 'side') this.sonic = false;
+      else if (dir === 'down' && !this.sonic && this.cfg().touchSonic && this.swipe(time, x, y, 'y', 1, FLICK_CELLS) !== null) {
+        this.sonic = true;
+        this.env.press('sonicDrop');
+      }
     }
 
     // Direction of the last DIR_CELLS of travel; while the finger is (nearly) still, the previous one.
@@ -282,7 +292,7 @@
   // Short description for the keys panel.
   function help(settings) {
     const s = settings.data.controls;
-    return 'Touch: drag ←/→ move (slow = precise) · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop · swipe ↑ hold (or swipe ↑ and let go after dragging ←/→)' +
+    return 'Touch: drag ←/→ move (slow = precise) · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop' + (s.touchSonic ? ' (keep the finger down: sonic drop)' : '') + ' · swipe ↑ hold (or swipe ↑ and let go after dragging ←/→)' +
       (s.touchWallFlick ? ' · flick ←/→ and let go: to the wall' : '') +
       ' · tap lower left / lower right' + (s.touchTap180 ? ' / top' : '') + ': rotate ' + (s.touchRotateSwap ? 'CCW / CW' : 'CW / CCW') +
       (s.touchTap180 ? ' / 180°' : '');

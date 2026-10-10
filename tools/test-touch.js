@@ -9,7 +9,7 @@ const { Gesture, tapZone } = window.TW.Touch;
 
 const DEFAULTS = {
   touchSlow: 1.5, touchFast: 0.6, touchFastSpeed: 20, touchVibrate: false, touchWallFlick: false,
-  touchRotateSwap: false, touchTap180: true, touchSlideDeadzone: 1,
+  touchRotateSwap: false, touchTap180: true, touchSonic: true, touchSlideDeadzone: 1,
 };
 
 // A fake game: the piece's column (0..7 like a T), whether soft drop is held, and every action in order.
@@ -133,6 +133,30 @@ test('moving the finger back up stops soft drop', () => {
 test('a fast swipe down hard drops at release', () => {
   const s = play([[0, 5, 5], [40, 5, 8.5]]);
   eq(s.log[s.log.length - 1], 'hardDrop', 'last action');
+  eq(s.log.filter((a) => a === 'sonicDrop').length, 1, 'sonic drop on the way');
+});
+
+test('a fast swipe down with the finger kept down sonic drops, without hard drop', () => {
+  const s = play([[0, 5, 5], [40, 5, 8.5], [500, 5, 8.5]]);
+  eq(s.log.filter((a) => a === 'sonicDrop').length, 1, 'sonic drops');
+  eq(has(s, 'hardDrop'), false, 'hard drop');
+});
+
+test('a slow drag down only soft drops', () => {
+  const s = play([[0, 5, 5], [400, 5, 8], [900, 5, 8]]);
+  eq(has(s, 'sonicDrop'), false, 'sonic drop');
+});
+
+test('one sonic drop per downward stroke', () => {
+  const twoStrokes = play([[0, 5, 5], [40, 5, 8.5], [300, 5, 8.5], [500, 5, 6], [540, 5, 9.5], [900, 5, 9.5]]);
+  eq(twoStrokes.log.filter((a) => a === 'sonicDrop').length, 2, 'up between strokes');
+  const oneStroke = play([[0, 5, 5], [40, 5, 8.5], [300, 5, 8.5], [340, 5, 12], [700, 5, 12]]);
+  eq(oneStroke.log.filter((a) => a === 'sonicDrop').length, 1, 'no up between');
+});
+
+test('sonic drop can be turned off', () => {
+  const s = play([[0, 5, 5], [40, 5, 8.5], [500, 5, 8.5]], { cfg: { touchSonic: false } });
+  eq(has(s, 'sonicDrop'), false, 'sonic drop');
 });
 
 test('drift during a hard drop swipe does not move the piece', () => {

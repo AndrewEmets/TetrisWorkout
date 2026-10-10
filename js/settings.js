@@ -6,7 +6,7 @@
   const VERSION = 1;
 
   const ACTIONS = [
-    ['left', 'Move left'], ['right', 'Move right'], ['softDrop', 'Soft drop'], ['hardDrop', 'Hard drop'],
+    ['left', 'Move left'], ['right', 'Move right'], ['softDrop', 'Soft drop'], ['hardDrop', 'Hard drop'], ['sonicDrop', 'Sonic drop'],
     ['rotCCW', 'Rotate CCW'], ['rotCW', 'Rotate CW'], ['rot180', 'Rotate 180'], ['hold', 'Hold'],
     ['retry', 'Retry board'], ['prev', 'Previous board'], ['skip', 'Next / new board'], ['hint', 'Show hint'],
     ['favorite', 'Favorite board'], ['target', 'Show / hide opener outline'],
@@ -18,16 +18,16 @@
       keyboard: {
         left: ['ArrowLeft'], right: ['ArrowRight'], softDrop: ['ArrowDown'], hardDrop: ['Space'],
         rotCCW: ['KeyZ', 'ControlLeft'], rotCW: ['KeyX', 'ArrowUp'], rot180: ['KeyA'], hold: ['KeyC', 'ShiftLeft'],
-        retry: ['KeyR'], prev: ['KeyB'], skip: ['KeyN'], hint: ['KeyH'], favorite: ['KeyF'], target: ['KeyT'],
+        retry: ['KeyR'], prev: ['KeyB'], skip: ['KeyN'], hint: ['KeyH'], favorite: ['KeyF'], target: ['KeyT'], sonicDrop: [],
       },
       gamepad: {
         left: ['b14', 'a0-'], right: ['b15', 'a0+'], softDrop: ['b13', 'a1+'], hardDrop: ['b12'],
         rotCCW: ['b0'], rotCW: ['b1'], rot180: ['b3'], hold: ['b4', 'b5'],
-        retry: ['b8'], prev: [], skip: ['b9'], hint: [], favorite: [], target: [],
+        retry: ['b8'], prev: [], skip: ['b9'], hint: [], favorite: [], target: [], sonicDrop: [],
       },
       deadzone: 0.5,
       touchSlow: 1.5, touchFast: 0.6, touchFastSpeed: 20, touchVibrate: true, touchWallFlick: false,
-      touchRotateSwap: false, touchTap180: true, touchSlideDeadzone: 1, touchLockPause: true,
+      touchRotateSwap: false, touchTap180: true, touchSonic: true, touchSlideDeadzone: 1, touchLockPause: true,
     },
     handling: {
       das: 10, arr: 2, dcd: 1, sdf: 6,
@@ -87,6 +87,7 @@
       { path: 'controls.touchSlow', label: 'Slow drag per column', hint: 'Finger travel for one column when dragging slowly (precise moves), in board cells', min: 0.5, max: 3, step: 0.1, unit: 'cells' },
       { path: 'controls.touchFast', label: 'Fast drag per column', hint: 'Finger travel for one column when dragging fast. Same as the slow value = no acceleration', min: 0.2, max: 3, step: 0.1, unit: 'cells' },
       { path: 'controls.touchFastSpeed', label: 'Fast drag speed', hint: 'Finger speed (board cells per second) from which the fast value applies; slower drags blend toward the slow value', min: 5, max: 60, step: 1, unit: 'cells/s' },
+      { path: 'controls.touchSonic', label: 'Fast swipe down and hold: sonic drop', hint: 'The piece falls to the floor without locking; let go during the swipe to hard drop', type: 'bool' },
       { path: 'controls.touchSlideDeadzone', label: 'Sideways dead zone in soft drop', hint: 'Extra finger travel before the first sideways move after a downward drag starts soft drop', min: 0, max: 3, step: 0.25, unit: 'cells' },
       { path: 'controls.touchWallFlick', label: 'Sideways flick sends the piece to the wall', hint: 'A fast sideways flick, released mid-motion, moves the piece all the way', type: 'bool' },
       { heading: 'Rotating' },
