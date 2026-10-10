@@ -1,4 +1,5 @@
 #!/bin/sh
-# Keeps the ?v= version stamps in index.html in sync with the files being committed.
-# Install once: git config core.hooksPath tools
+# Runs the touch gesture tests and keeps the ?v= version stamps in index.html in sync with the files being
+# committed. Install once: git config core.hooksPath tools
+node tools/test-touch.js > /dev/null || { node tools/test-touch.js; echo "Touch tests failed: commit aborted."; exit 1; }
 node tools/stamp-versions.js && git add index.html

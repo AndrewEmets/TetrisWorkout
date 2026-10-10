@@ -59,15 +59,19 @@ On a phone or tablet, play on the board area:
   On Android each step also gives a short vibration. Optionally a fast sideways flick, released mid-motion,
   sends the piece to the wall. All of it is adjustable in ⚙ Settings → Game.
 - **Drag down and keep the finger down:** soft drop, like holding the soft drop key; move back up to stop.
-  It also works in the middle of a sideways drag, and sideways drags keep moving the piece while it soft
-  drops, so you can slide it under an overhang without lifting the finger. The first sideways step there needs
-  a little extra travel (a dead zone, adjustable in ⚙ Settings → Game) so the piece doesn't shift by accident.
-- **Swipe down fast and let go:** hard drop. **Swipe up:** hold; during a sideways drag, swipe up and let go.
-  Sideways drift during these swipes doesn't move the piece.
+  It also works in the middle of a sideways drag. Moving sideways while soft dropping slides the piece and
+  pauses the drop (moving down again resumes it), so the piece never falls diagonally and you can slide it
+  under an overhang without lifting the finger. The first sideways step there needs a little extra travel
+  (a dead zone, adjustable in ⚙ Settings → Game) so the piece doesn't shift by accident.
+- **Swipe down fast and let go:** hard drop. **Swipe up:** hold; after a sideways drag, swipe up and let go.
+  Each movement counts only along its own direction (sideways, down or up, within 35°), so drift during a
+  swipe doesn't move the piece and a diagonal drag does nothing.
 - **Tap the left / right half of the screen:** rotate CW / CCW.
 - With gravity on, a landed piece doesn't lock while your finger is on the screen, so there is time to lift
   it and tap a spin (lock delay starts after you lift; it can be turned off in ⚙ Settings → Game).
   ⚙ Settings → Game can swap the taps and change how far a drag moves the piece.
+
+The gestures are covered by tests: `node tools/test-touch.js` (the pre-commit hook runs them).
 
 On a phone the toolbar folds under the ☰ button; retry and next stay next to it. The board area fills the
 screen and takes gestures everywhere, even around the board; the goal, guide and stats open with the ℹ button.

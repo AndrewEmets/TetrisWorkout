@@ -1,226 +1,268 @@
 // Touch controls on the play area (#stage: the whole screen under the toolbar on phones).
 //
-// One finger at a time. Every touch is one gesture: it can move the piece sideways, soft drop it, hold it,
-// rotate it (a tap) and finally hard drop it (a fast swipe at release). Distances are in board cells (u = one
-// cell in CSS px), so the feel is the same on every screen size.
+// One finger at a time; every touch is one Gesture. It can move the piece sideways, soft drop it, hold it,
+// rotate it (a tap) and finally hard drop it (a fast swipe at release). Gesture works in board cells and
+// milliseconds and knows nothing about the page: attach() feeds it pointer events and gives it the game
+// actions, and tools/test-touch.js feeds it recorded gestures.
 //
-// 1. Tap: lift within TAP_MS without moving 0.5 cells -> rotate. Left half of the screen CW, right half CCW
-//    (swappable). Rotation happens on release, since only then is it clear the touch wasn't a drag.
+// The finger's movement is classified as it goes, over its last DIR_CELLS of travel: sideways (within 35° of
+// horizontal), down or up (within 35° of vertical), or diagonal. Each kind drives one thing:
 //
-// 2. Direction lock: the first 0.5 cells of travel decide the gesture's mode.
-//    'h' (mostly sideways): a sideways drag. It can still turn into soft drop, hold or hard drop later.
-//    'v' (mostly vertical): a drop / hold gesture. Sideways moves start only once soft drop is on (see 4).
+//   sideways -> moves the piece. The travel is scaled by finger speed: slow drags take touchSlow (1.5) cells
+//     per column, fast ones touchFast (0.6), blended in between, so careful short moves land on the right
+//     column and a quick sweep crosses the board. Going back after a step takes only REVERSE_CELLS (0.5):
+//     an overshoot is quick to fix, and a finger resting near a column edge doesn't make the piece jitter.
+//     Sideways movement pauses soft drop, so the piece never falls diagonally.
+//     e.g. drag 3 cells right slowly -> 2 columns; then half a cell back -> 1 column back.
+//     e.g. sweep 2 cells left in 50 ms -> 3 columns.
+//   down -> soft drop, once the finger has gone SOFT_START cells down in a row. It stays on while the finger
+//     stays down (like holding the soft drop key) and stops when the finger moves SOFT_STOP cells up from its
+//     lowest point. After a sideways pause, moving down again resumes it.
+//     e.g. drag down 3 cells and keep the finger there -> the piece falls at soft drop speed until you lift.
+//     e.g. drag down to the floor, then right -> the piece slides along the floor under a roof.
+//   up -> hold, after HOLD_CELLS cells up in a gesture that hasn't moved or dropped the piece yet.
+//   diagonal -> nothing: a slanted drag neither moves nor drops the piece.
 //
-// 3. Sideways moves. The finger's travel is scaled by its speed (gain) into vx; each time vx is one column
-//    (touchSlow cells) away from the last step's anchor x, the piece moves one column. Slow drags take
-//    1.5 cells per column, fast ones 0.6 (touchFast at touchFastSpeed), blended in between: careful short
-//    moves land on the right column, a quick sweep crosses the board.
-//    Going back the other way takes only REVERSE_CELLS (hysteresis): an overshoot is fixed with a small
-//    move back, and a finger resting near a column edge doesn't make the piece jitter.
-//    Movements that are mostly vertical (|dy| > 2|dx|) don't count, so sideways drift during a drop or
-//    hold swipe doesn't move the piece. Each step vibrates on Android (touchVibrate).
-//    e.g. drag 3 cells right slowly -> 2 columns; then 0.5 cells back -> 1 column back.
-//    e.g. sweep 2 cells left in 50 ms -> 3 columns.
+// Lifting the finger:
+//   - without having moved TAP_CELLS, within TAP_MS: a tap -> rotate (left half of the screen CW, right half
+//     CCW; swappable). It happens on release, since only then is it clear the touch wasn't a drag.
+//   - during a fast swipe (FLICK_CELLS within FLICK_WINDOW, at FLICK_SPEED or faster):
+//       down -> hard drop. Sideways steps made during the swipe are undone first, so it drops where it started.
+//       up -> hold (also after sideways moves, e.g. drag right, then swipe up and let go).
+//       sideways, with touchWallFlick on -> the piece goes all the way to the wall.
+//   - otherwise nothing more: the piece stays where the drag left it.
+//   e.g. drag right 2 columns, then swipe down and let go -> hard drop 2 columns to the right.
 //
-// 4. Soft drop: held while the finger stays below the point where the downward drag started, like holding
-//    the soft drop key; moving the finger up one cell from its lowest point stops it. It starts after 1 cell
-//    of downward travel ('v'), or 1.5 cells of steep downward travel in a sideways drag (drift during a
-//    sideways drag resets the count, so a slanted drag doesn't start it).
-//    While soft drop is on, sideways moves work too (slide a piece under an overhang without lifting the
-//    finger); in a 'v' gesture the first such step needs touchSlideDeadzone extra cells.
-//    e.g. drag down 3 cells and keep the finger there -> the piece falls at soft drop speed until you lift.
-//    e.g. drag down to the floor, then right 2 cells -> the piece slides right under a roof.
-//
-// 5. Hold: a 'v' gesture going 1.5 cells up holds at once. In a sideways drag, a fast upward flick at
-//    release holds (so an upward wobble mid-drag doesn't).
-//
-// 6. Release: lifting the finger during a fast swipe -
-//    down (FLICK_CELLS within FLICK_WINDOW at FLICK_SPEED or faster) -> hard drop. Sideways steps made during
-//      that swipe are undone first, so a slanted swipe drops where the swipe started;
-//    up -> hold (see 5);
-//    sideways, with touchWallFlick on -> the piece goes all the way to the wall.
-//    A slow lift does nothing more: the piece stays where the drag left it.
-//    e.g. drag right 2 columns, then swipe down and let go -> hard drop 2 columns to the right.
-//
-// 7. New piece: a gesture that started before the current piece appeared (the last one locked or was held)
-//    is ignored until the finger lifts, so a swipe can't also hard drop the next piece. While a finger is
-//    down, the game's lock delay waits (game.touching), so there is time to lift and tap a spin.
+// Also:
+//   - The first sideways step after soft drop starts, in a gesture that hadn't moved sideways, needs
+//     touchSlideDeadzone extra cells, against accidental moves while dropping.
+//   - A gesture that started before the current piece appeared (the last one locked or was held) is ignored
+//     until the finger lifts, so a swipe can't also hard drop the next piece.
+//   - While a finger is down the game's lock delay waits (game.touching), so there is time to lift and tap a spin.
+//   - Each sideways step vibrates on Android (touchVibrate).
 (function (TW) {
   'use strict';
 
-  const TAP_MS = 300; // longest touch that still counts as a tap
-  const FLICK_WINDOW = 120; // ms of finger movement a flick is measured over
-  const FLICK_CELLS = 2.5; // a flick covers at least this many cells within the window...
-  const FLICK_SPEED = 1.2; // ...at this speed or faster (px per ms)
-  const WALL_CELLS = 2; // a sideways flick to the wall covers this many cells within the window, at FLICK_SPEED
-  const SPEED_WINDOW = 60; // ms the sideways finger speed is measured over
-  const REVERSE_CELLS = 0.5; // finger travel back (at slow speed) that undoes the last sideways step
+  const TAP_MS = 300; // longest touch that still counts as a tap...
+  const TAP_CELLS = 0.5; // ...and the farthest it may move
+  const TRAIL_MS = 400; // finger path kept for direction, speed and swipe checks
+  const DIR_CELLS = 0.35; // path length the movement direction is measured over
+  const CONE = 0.7; // tan(35°): movement within 35° of an axis counts as along it
+  const SPEED_WINDOW = 60; // ms the sideways speed (for the drag gain) is measured over
+  const REVERSE_CELLS = 0.5; // travel back (at slow speed) that undoes the last sideways step
+  const SOFT_START = 1; // cells down in a row that start soft drop
+  const SOFT_STOP = 1; // cells up from the lowest point that stop it
+  const HOLD_CELLS = 1.5; // cells up that hold
+  const FLICK_WINDOW = 120; // ms a release swipe is measured over
+  const FLICK_CELLS = 2.5; // a down / up swipe covers at least this many cells within the window...
+  const WALL_CELLS = 2; // ...a sideways one at least this many...
+  const FLICK_SPEED = 0.06; // ...at this speed or faster (cells per ms)
   const SRC = 'touch'; // input source id for the held soft drop
+
+  class Gesture {
+    // cfg(): the touch settings (settings.data.controls).
+    // env: { shift(d) -> whether the piece moved, press(action), softDrop(on), buzz(), pieceId() }
+    constructor(cfg, env, time, x, y) {
+      this.cfg = cfg;
+      this.env = env;
+      this.t0 = time;
+      this.x0 = x;
+      this.y0 = y;
+      this.trail = [[time, x, y]];
+      this.sx = x; // finger x / y up to which sideways / vertical travel has been counted
+      this.sy = y;
+      this.piece = env.pieceId();
+      this.moved = false; // left the tap radius
+      this.dir = null; // current movement: 'side' | 'down' | 'up' | 'diag' (null until clear)
+      // Sideways: vx is the sideways travel with the speed gain applied, anchor where the last step happened,
+      // stepDir that step's direction (0 before the first), dead the extra travel the next step needs.
+      this.vx = 0;
+      this.anchor = 0;
+      this.stepDir = 0;
+      this.dead = 0;
+      this.steps = []; // [time, direction] of each sideways step
+      this.sideSeen = false;
+      // Vertical: travel down / up in a row, soft drop engaged (may be paused) and pressed, lowest point.
+      this.fall = 0;
+      this.rise = 0;
+      this.drop = false;
+      this.dropSeen = false;
+      this.softOn = false;
+      this.bottom = y;
+      this.held = false;
+    }
+
+    get stale() { return this.piece !== this.env.pieceId(); }
+
+    move(time, x, y) {
+      if (this.stale) { this.setSoft(false); return; }
+      this.trail.push([time, x, y]);
+      while (this.trail.length > 1 && time - this.trail[0][0] > TRAIL_MS) this.trail.shift();
+      if (Math.hypot(x - this.x0, y - this.y0) >= TAP_CELLS) this.moved = true;
+      const dir = this.direction(x, y);
+      if (!dir) return;
+      this.dir = dir;
+      // Sideways movement counts only sideways travel and vertical movement only vertical travel, so drift
+      // along the other axis is dropped. Travel while the direction is unclear (the start of a gesture, a
+      // corner, a diagonal stretch: up to half a cell) counts for whichever direction comes next.
+      let dx = 0, dy = 0;
+      if (dir === 'side') { dx = x - this.sx; this.sx = x; this.sy = y; }
+      else if (dir !== 'diag') { dy = y - this.sy; this.sy = y; this.sx = x; }
+      else {
+        this.sx = Math.min(x + 0.5, Math.max(x - 0.5, this.sx));
+        this.sy = Math.min(y + 0.5, Math.max(y - 0.5, this.sy));
+      }
+      if (dir === 'side') this.sideways(time, x, dx);
+      this.vertical(dir, y, dy);
+    }
+
+    // Direction of the last DIR_CELLS of travel; while the finger is (nearly) still, the previous one.
+    direction(x, y) {
+      for (let i = this.trail.length - 2; i >= 0; i--) {
+        const [, px, py] = this.trail[i];
+        const ax = Math.abs(x - px), ay = Math.abs(y - py);
+        if (Math.hypot(ax, ay) < DIR_CELLS) continue;
+        if (ay <= ax * CONE) return 'side';
+        if (ax <= ay * CONE) return y > py ? 'down' : 'up';
+        return 'diag';
+      }
+      return this.dir;
+    }
+
+    sideways(time, x, dx) {
+      const c = this.cfg();
+      this.sideSeen = true;
+      this.setSoft(false); // no diagonal falls: soft drop pauses while the finger moves sideways
+      this.vx += dx * c.touchSlow / this.cellsPerColumn(this.speed(time, x));
+      for (;;) {
+        const d = Math.sign(this.vx - this.anchor);
+        const need = d === -this.stepDir ? REVERSE_CELLS : c.touchSlow + this.dead;
+        if (!d || Math.abs(this.vx - this.anchor) < need) break;
+        this.anchor += d * need;
+        this.stepDir = d;
+        this.dead = 0;
+        if (this.env.shift(d)) { this.steps.push([time, d]); this.env.buzz(); }
+      }
+    }
+
+    vertical(dir, y, dy) {
+      if (dir === 'down') { this.fall += Math.max(0, dy); this.rise = 0; }
+      else if (dir === 'up') { this.rise += Math.max(0, -dy); this.fall = 0; }
+      else if (dir === 'side') { this.fall = 0; this.rise = 0; }
+      if (this.drop) {
+        this.bottom = Math.max(this.bottom, y);
+        if (y <= this.bottom - SOFT_STOP) { this.drop = false; this.fall = 0; this.setSoft(false); }
+        else if (dir === 'down') this.setSoft(true); // resumes after a sideways pause
+      } else if (this.fall >= SOFT_START) {
+        this.drop = true;
+        this.bottom = y;
+        this.setSoft(true);
+        if (!this.dropSeen && !this.sideSeen) { this.anchor = this.vx; this.stepDir = 0; this.dead = this.cfg().touchSlideDeadzone; }
+        this.dropSeen = true;
+      }
+      if (!this.held && !this.sideSeen && !this.dropSeen && this.rise >= HOLD_CELLS) { this.held = true; this.env.press('hold'); }
+    }
+
+    // leftHalf: the touch ended on the left half of the screen (which way a tap rotates).
+    end(time, x, y, leftHalf) {
+      this.setSoft(false);
+      if (this.stale) return;
+      const c = this.cfg();
+      if (!this.moved && time - this.t0 < TAP_MS) { this.env.press(leftHalf !== c.touchRotateSwap ? 'rotCW' : 'rotCCW'); return; }
+      if (c.touchWallFlick) {
+        for (const d of [-1, 1]) {
+          if (this.swipe(time, x, y, 'x', d, WALL_CELLS, 0.5) === null) continue;
+          let moved = false;
+          while (this.env.shift(d)) moved = true;
+          if (moved) this.env.buzz();
+          return;
+        }
+      }
+      if (!this.held && this.swipe(time, x, y, 'y', -1, FLICK_CELLS) !== null) { this.env.press('hold'); return; }
+      const start = this.swipe(time, x, y, 'y', 1, FLICK_CELLS);
+      if (start === null) return;
+      for (const [t, d] of this.steps.slice().reverse()) {
+        if (t < start) break;
+        if (!this.env.shift(-d)) break;
+      }
+      this.env.press('hardDrop');
+    }
+
+    cancel() { this.setSoft(false); }
+
+    setSoft(on) {
+      if (this.softOn === on) return;
+      this.softOn = on;
+      this.env.softDrop(on);
+    }
+
+    // Sideways finger speed over the last SPEED_WINDOW ms, in cells per second.
+    speed(time, x) {
+      const i = this.trail.findIndex((q) => time - q[0] <= SPEED_WINDOW);
+      const p = this.trail[Math.min(i, this.trail.length - 2)] || this.trail[0];
+      return Math.abs(x - p[1]) / Math.max(8, time - p[0]) * 1000;
+    }
+
+    // Finger travel per column at this speed: touchSlow for slow drags, touchFast from touchFastSpeed up.
+    cellsPerColumn(speed) {
+      const c = this.cfg();
+      const lo = c.touchFastSpeed * 0.2;
+      const k = Math.min(1, Math.max(0, (speed - lo) / (c.touchFastSpeed - lo)));
+      return c.touchSlow + (c.touchFast - c.touchSlow) * k * k * (3 - 2 * k);
+    }
+
+    // Start time of a fast swipe that ends at (x, y) now, or null: a point of the last FLICK_WINDOW ms at
+    // least `dist` cells back along `axis` in direction `dir`, covered at FLICK_SPEED or faster, with at most
+    // `ratio` times as much movement across.
+    swipe(time, x, y, axis, dir, dist, ratio = Infinity) {
+      const p = this.trail.find(([t1, x1, y1]) => {
+        if (time - t1 > FLICK_WINDOW) return false;
+        const along = dir * (axis === 'x' ? x - x1 : y - y1);
+        const across = Math.abs(axis === 'x' ? y - y1 : x - x1);
+        return along >= dist && along / Math.max(1, time - t1) >= FLICK_SPEED && across <= along * ratio;
+      });
+      return p ? p[0] : null;
+    }
+  }
 
   // opts: { game, input, settings, cell: () => board cell size in CSS pixels }
   function attach(el, opts) {
     const { game, input, settings } = opts;
-    let t = null; // the touch being tracked
-
     const cfg = () => settings.data.controls;
-    const press = (a) => input.onPress(a);
-
-    function softDrop(g, on) {
-      if (g.soft === on) return;
-      g.soft = on;
-      if (on) input.press('softDrop', SRC);
-      else input.release('softDrop', SRC);
-    }
-
-    function buzz() {
-      if (cfg().touchVibrate && navigator.vibrate) {
-        try { navigator.vibrate(8); } catch (err) { /* not allowed yet */ }
-      }
-    }
-
-    // Finger travel per column in px at this sideways finger speed (cells per second): slow drags travel more
-    // per column, so small moves are easy to stop on the right column; fast drags less, to cross the board quickly.
-    function stepPx(speed, c) {
-      const s = cfg();
-      const lo = s.touchFastSpeed * 0.2;
-      const k = Math.min(1, Math.max(0, (speed - lo) / (s.touchFastSpeed - lo)));
-      const f = k * k * (3 - 2 * k); // smooth blend
-      return (s.touchSlow + (s.touchFast - s.touchSlow) * f) * c;
-    }
-
-    // Was the finger moving fast down (dir 1) or up (dir -1) when it left the screen? Returns when that swipe
-    // started, or null. Measured from any point of the last FLICK_WINDOW ms, so a swipe right after a sideways
-    // drag isn't slowed down by the sideways part.
-    function flickStart(g, time, y, dir) {
-      while (g.trail.length > 1 && time - g.trail[0][0] > FLICK_WINDOW) g.trail.shift();
-      const dist = FLICK_CELLS * opts.cell();
-      const p = g.trail.find(([t1, y1]) => dir * (y - y1) >= dist && dir * (y - y1) / Math.max(1, time - t1) >= FLICK_SPEED);
-      return p ? p[0] : null;
-    }
-
-    // A fast, mostly sideways flick at release: its direction (-1 / 1), or 0.
-    function wallFlick(g, time, x, y) {
-      const dist = WALL_CELLS * opts.cell();
-      const p = g.trail.find(([t1, y1, x1]) => time - t1 <= FLICK_WINDOW && Math.abs(x - x1) >= dist &&
-        Math.abs(x - x1) > 2 * Math.abs(y - y1) && Math.abs(x - x1) / Math.max(1, time - t1) >= FLICK_SPEED);
-      return p ? Math.sign(x - p[2]) : 0;
-    }
+    const env = {
+      shift: (d) => game.touchShift(d),
+      press: (a) => input.onPress(a),
+      softDrop: (on) => (on ? input.press('softDrop', SRC) : input.release('softDrop', SRC)),
+      buzz: () => {
+        if (cfg().touchVibrate && navigator.vibrate) {
+          try { navigator.vibrate(8); } catch (err) { /* not allowed yet */ }
+        }
+      },
+      pieceId: () => game.pieceId,
+    };
+    let g = null, id = null; // the gesture being tracked and its pointer
+    const pos = (e) => [e.clientX / opts.cell(), e.clientY / opts.cell()];
 
     el.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'touch' || t || !input.enabled) return;
+      if (e.pointerType !== 'touch' || g || !input.enabled) return;
       e.preventDefault();
       try { el.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
-      t = {
-        id: e.pointerId, x0: e.clientX, y0: e.clientY, top: e.clientY, bottom: e.clientY,
-        // vx: finger x with the speed-dependent gain applied; x: where the last sideways step happened (same
-        // scale); dir: direction of that step (0 before the first one)
-        vx: e.clientX, x: e.clientX, dir: 0,
-        t0: e.timeStamp, mode: null, held: false, soft: false, slide: false, dead: 0, trail: [[e.timeStamp, e.clientY, e.clientX]],
-        lastX: e.clientX, lastY: e.clientY, moves: [], // moves: [time, direction] of each sideways step
-        piece: game.pieceId, // a new piece ends this gesture (it doesn't act on the next piece)
-      };
+      g = new Gesture(cfg, env, e.timeStamp, ...pos(e));
+      id = e.pointerId;
       game.touching = true;
     });
-
     el.addEventListener('pointermove', (e) => {
-      if (!t || e.pointerId !== t.id) return;
+      if (!g || e.pointerId !== id) return;
       e.preventDefault();
-      // A new piece appeared during this touch (the last one locked, or was held): ignore the rest of it.
-      if (t.piece !== game.pieceId) { softDrop(t, false); return; }
-      const u = opts.cell(), y = e.clientY;
-      let ddx = e.clientX - t.lastX;
-      const ddy = y - t.lastY;
-      t.lastX = e.clientX;
-      t.lastY = y;
-      t.trail.push([e.timeStamp, y, e.clientX]);
-      while (t.trail.length > 1 && e.timeStamp - t.trail[0][0] > FLICK_WINDOW) t.trail.shift();
-      // The first clear movement decides whether this touch moves the piece sideways or drops / holds it.
-      if (!t.mode) {
-        const dx = e.clientX - t.x0, dy = y - t.y0;
-        if (Math.max(Math.abs(dx), Math.abs(dy)) < u * 0.5) return;
-        t.mode = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
-        ddx = dx; // count the travel before the decision too
-      }
-      // Sideways moves: in a sideways drag, and after a downward drag started soft drop (slide the piece
-      // into an overhang without lifting the finger).
-      if (t.mode === 'h' || t.slide) {
-        // While the finger heads mostly down or up (into a hard drop or hold swipe), sideways drift is ignored.
-        if (Math.abs(ddy) <= 2 * Math.abs(ddx)) {
-          const i = t.trail.findIndex((q) => e.timeStamp - q[0] <= SPEED_WINDOW);
-          const p = t.trail[Math.min(i, t.trail.length - 2)] || t.trail[0];
-          const speed = Math.abs(e.clientX - p[2]) / Math.max(8, e.timeStamp - p[0]) * 1000 / u; // cells per second
-          const slow = cfg().touchSlow * u;
-          t.vx += ddx * slow / stepPx(speed, u);
-          // A step needs one column of travel; going back the other way needs only REVERSE_CELLS. During soft
-          // drop the first step needs extra travel (dead zone), against accidental moves.
-          for (;;) {
-            const d = Math.sign(t.vx - t.x);
-            const need = d === -t.dir ? REVERSE_CELLS * u : slow + t.dead;
-            if (!d || Math.abs(t.vx - t.x) < need) break;
-            t.x += d * need;
-            t.dir = d;
-            t.dead = 0;
-            if (game.touchShift(d)) { t.moves.push([e.timeStamp, d]); buzz(); }
-          }
-        }
-      }
-      // Soft drop while the finger is held below where the downward drag started; moving back up stops it.
-      // A sideways drag needs a bit more downward travel, so small wobbles don't drop the piece.
-      if (t.soft) {
-        t.bottom = Math.max(t.bottom, y);
-        if (y < t.bottom - u) { softDrop(t, false); t.top = y; }
-      } else {
-        // In a sideways drag only steep downward travel counts: the finger drifting down while it moves
-        // sideways doesn't start soft drop.
-        if (t.mode === 'h' && Math.abs(ddx) >= Math.abs(ddy)) t.top = y;
-        t.top = Math.min(t.top, y);
-        if (y - t.top >= (t.mode === 'h' ? 1.5 : 1) * u) {
-          softDrop(t, true);
-          t.bottom = y;
-          if (!t.slide) {
-            t.slide = true;
-            t.x = t.vx;
-            t.dir = 0;
-            if (t.mode === 'v') t.dead = cfg().touchSlideDeadzone * u;
-          }
-        }
-      }
-      if (t.mode === 'v' && !t.held && !t.soft && y - t.y0 <= -1.5 * u) { t.held = true; press('hold'); }
+      g.move(e.timeStamp, ...pos(e));
     });
-
     const end = (e, cancelled) => {
-      if (!t || e.pointerId !== t.id) return;
-      const g = t;
-      t = null;
+      if (!g || e.pointerId !== id) return;
+      const gesture = g;
+      g = null;
       game.touching = false;
-      softDrop(g, false);
-      if (cancelled || g.piece !== game.pieceId) return;
-      const u = opts.cell();
-      if (!g.mode && Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < u * 0.5 && e.timeStamp - g.t0 < TAP_MS) {
-        const left = e.clientX < window.innerWidth / 2;
-        press(left !== cfg().touchRotateSwap ? 'rotCW' : 'rotCCW');
-        return;
-      }
-      // Fast sideways flick and let go: all the way to the wall.
-      if (cfg().touchWallFlick && g.mode === 'h' && !g.soft) {
-        const d = wallFlick(g, e.timeStamp, e.clientX, e.clientY);
-        if (d) {
-          let moved = false;
-          while (game.touchShift(d)) moved = true;
-          if (moved) buzz();
-          return;
-        }
-      }
-      // Swipe up and let go during a sideways drag: hold (a vertical swipe up holds right away, see above).
-      if (!g.held && flickStart(g, e.timeStamp, e.clientY, -1) !== null) { press('hold'); return; }
-      const start = flickStart(g, e.timeStamp, e.clientY, 1);
-      if (start === null) return;
-      // Undo sideways steps made during the swipe itself, so a slanted swipe drops where it started.
-      for (const [time, d] of g.moves.slice().reverse()) {
-        if (time < start) break;
-        if (!game.touchShift(-d)) break;
-      }
-      press('hardDrop');
+      if (cancelled) gesture.cancel();
+      else gesture.end(e.timeStamp, ...pos(e), e.clientX < window.innerWidth / 2);
     };
     el.addEventListener('pointerup', (e) => end(e, false));
     el.addEventListener('pointercancel', (e) => end(e, true));
@@ -231,10 +273,10 @@
   // Short description for the keys panel.
   function help(settings) {
     const s = settings.data.controls;
-    return 'Touch: drag ←/→ move (slow = precise) · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop · swipe ↑ hold (or swipe ↑ and let go while dragging ←/→)' +
+    return 'Touch: drag ←/→ move (slow = precise) · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop · swipe ↑ hold (or swipe ↑ and let go after dragging ←/→)' +
       (s.touchWallFlick ? ' · flick ←/→ and let go: to the wall' : '') +
       ' · tap left / right: rotate ' + (s.touchRotateSwap ? 'CCW / CW' : 'CW / CCW');
   }
 
-  TW.Touch = { attach, help };
+  TW.Touch = { attach, help, Gesture };
 })(window.TW);
