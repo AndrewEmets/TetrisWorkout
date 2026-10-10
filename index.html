@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Tetris Workout</title>
+  <meta name="theme-color" content="#121318">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="stylesheet" href="style.css?v=57433a1e">
 </head>
 <body>
@@ -102,6 +109,7 @@
         <button data-tab="controls" class="active">Controls</button>
         <button data-tab="handling">Handling</button>
         <button data-tab="game">Game</button>
+        <button data-tab="look">Look &amp; sound</button>
         <button data-tab="touch">Touch</button>
         <button data-tab="io">Import / Export</button>
       </nav>
@@ -119,6 +127,9 @@
       </section>
       <section class="tab hidden" data-tab="game">
         <div id="fields-game" class="fields"></div>
+      </section>
+      <section class="tab hidden" data-tab="look">
+        <div id="fields-look" class="fields"></div>
       </section>
       <section class="tab hidden" data-tab="touch">
         <p class="muted">Touch controls for phones and tablets. Distances are in board cells.</p>
@@ -154,12 +165,13 @@
   <script src="js/guides.js?v=3ee933a7"></script>
   <script src="js/genservice.js?v=e292bbf9"></script>
   <script src="js/favorites.js?v=ae3ddddc"></script>
-  <script src="js/settings.js?v=121b903e"></script>
+  <script src="js/settings.js?v=3aabad1f"></script>
   <script src="js/input.js?v=a272184b"></script>
   <script src="js/touch.js?v=329935c3"></script>
-  <script src="js/game.js?v=a2e6f02a"></script>
-  <script src="js/render.js?v=2c4fe966"></script>
+  <script src="js/game.js?v=5960ca89"></script>
+  <script src="js/sound.js?v=04a61cb9"></script>
+  <script src="js/render.js?v=dcfd7ded"></script>
   <script src="js/debug.js?v=3a8bb21e"></script>
-  <script src="js/main.js?v=83c65389"></script>
+  <script src="js/main.js?v=8779ec4f"></script>
 </body>
 </html>

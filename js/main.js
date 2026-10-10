@@ -295,6 +295,15 @@
   if (window.ResizeObserver) new ResizeObserver(resize).observe(document.getElementById('stage'));
   resize();
 
+  const sound = new TW.Sound(settings);
+  TW.sound = sound;
+  game.listen((e) => { renderer.effect(e, game.g); sound.event(e); });
+
+  // Installable app (Add to Home screen opens without the browser UI); the service worker also lets it start offline.
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* offline play is optional */ });
+  }
+
   TW.Touch.attach(document.getElementById('stage'), { game, input, settings, cell: () => renderer.c });
 
   let last = performance.now();

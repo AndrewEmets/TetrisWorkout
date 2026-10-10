@@ -1,6 +1,6 @@
 // Canvas renderer: hold box, field (with 2 rows above the visible area), next queue, ghost, hint and messages,
-// plus the effects the game emits (game.events): drop trails, board shake, lock and line clear flashes, particles
-// and clear callouts.
+// plus the effects the game emits (effect(), from game.listen): drop trails, board shake, lock and line clear
+// flashes, particles and clear callouts.
 (function (TW) {
   'use strict';
 
@@ -9,8 +9,14 @@
   const HIDDEN_SHOWN = 2;
   const FIRST_ROW = H - VISIBLE - HIDDEN_SHOWN;
   const ROWS = 23.5;
-  const SIDE = 4.5, SIDE_NARROW = 3; // width of the hold / next boxes, in cells
-  const cols = (side) => 2 * side + 12; // hold + field (10) + next + margins
+  // Layouts (sizes in cells): 'side' has hold on the left and next on the right of the field (hold + field + next
+  // + margins); 'right' puts hold, next and stats in one column on the right, so on a narrow (phone) screen the
+  // field gets more of the width. resize() picks whichever gives the bigger field.
+  const LAYOUTS = [
+    { name: 'side', side: 4.5, cols: 2 * 4.5 + 12 },
+    { name: 'side', side: 3, cols: 2 * 3 + 12 },
+    { name: 'right', side: 2.6, cols: 0.4 + 10 + 0.4 + 2.6 + 0.4 },
+  ];
 
   // Locked cells are a little darker and less saturated than the falling piece (and the hold / next previews).
   const LOCKED = {}, ACTIVE = {};
@@ -27,9 +33,11 @@
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       this.c = 24;
-      this.side = SIDE;
+      this.layout = LAYOUTS[0];
+      this.skin = 'classic';
+      this.skins = new Map(); // pre-rendered blocks: 'skin|color|size' -> canvas
       this.shakes = []; // { t, x, y, dur }: board offsets in cells
-      this.trails = []; // { t, dur, color, cols: [{ x, y0, y1 }] }
+      this.trails = []; // { t, dur, color, cols: [{ x, y0, y1 }] }: one shape over the piece's columns
       this.flashes = []; // { t, kind: 'lock' | 'clear' | 'pc', cells | rows }
       this.particles = []; // { x, y, vx, vy, age, life, size, color } in cells, relative to the field
       this.lastDraw = performance.now();
@@ -48,7 +56,7 @@
       if (e.kind === 'drop') {
         const top = new Map();
         for (const [x, y] of e.cells) top.set(x, Math.min(y, top.has(x) ? top.get(x) : Infinity));
-        const cols = [...top].map(([x, y]) => ({ x, y0: y, y1: y + e.dist }));
+        const cols = [...top].map(([x, y]) => ({ x, y0: y, y1: y + e.dist })).sort((a, b) => a.x - b.x);
         this.trails.push({ t: e.t, dur: e.hard ? TRAIL_MS : TRAIL_MS * 0.8, color: ACTIVE[e.type], cols });
       } else if (e.kind === 'lock') {
         this.flashes.push({ t: e.t, kind: 'lock', cells: e.cells });
@@ -81,7 +89,8 @@
       return [x * this.c, y * this.c];
     }
 
-    // Fading streaks from where a dropped piece started to where it landed; they shrink toward the landing.
+    // A fading streak from where a dropped piece started to where it landed, as wide as the piece: one shape whose
+    // top and bottom edges follow the piece's top in each column. It shrinks toward the landing spot.
     drawTrails(now) {
       const ctx = this.ctx, c = this.c;
       this.trails = this.trails.filter((t) => now - t.t < t.dur);
@@ -92,16 +101,23 @@
       ctx.clip();
       for (const t of this.trails) {
         const k = Math.max(0, now - t.t) / t.dur, ease = 1 - (1 - k) * (1 - k);
-        for (const { x, y0, y1 } of t.cols) {
-          const top = this.rowY(y0 + (y1 - y0) * ease), bottom = this.rowY(y1);
-          if (bottom - top < 1) continue;
-          const grad = ctx.createLinearGradient(0, top, 0, bottom);
-          grad.addColorStop(0, 'rgba(255,255,255,0)');
-          grad.addColorStop(1, t.color);
-          ctx.globalAlpha = 0.45 * (1 - k);
-          ctx.fillStyle = grad;
-          ctx.fillRect(this.fx + (x + 0.12) * c, top, c * 0.76, bottom - top);
-        }
+        const cols = t.cols, last = cols.length - 1;
+        const left = (i) => this.fx + (cols[i].x + (i === 0 ? 0.08 : 0)) * c;
+        const right = (i) => this.fx + (cols[i].x + (i === last ? 0.92 : 1)) * c;
+        const tops = cols.map((col) => this.rowY(col.y0 + (col.y1 - col.y0) * ease));
+        const bottoms = cols.map((col) => this.rowY(col.y1));
+        const top = Math.min(...tops), bottom = Math.max(...bottoms);
+        if (bottom - top < 1) continue;
+        ctx.beginPath();
+        cols.forEach((col, i) => { ctx.lineTo(left(i), tops[i]); ctx.lineTo(right(i), tops[i]); });
+        for (let i = last; i >= 0; i--) { ctx.lineTo(right(i), bottoms[i]); ctx.lineTo(left(i), bottoms[i]); }
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, top, 0, bottom);
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(1, t.color);
+        ctx.globalAlpha = 0.45 * (1 - k);
+        ctx.fillStyle = grad;
+        ctx.fill();
       }
       ctx.restore();
     }
@@ -188,12 +204,13 @@
     // On narrow screens (phones) the hold / next boxes get thinner so the field can be bigger.
     resize() {
       const parent = this.canvas.parentElement;
-      const fit = (side) => Math.floor(Math.min(parent.clientWidth / cols(side), parent.clientHeight / ROWS));
-      this.side = fit(SIDE_NARROW) > fit(SIDE) ? SIDE_NARROW : SIDE;
-      const c = Math.max(12, fit(this.side));
-      const COLS = cols(this.side);
+      const fit = (l) => Math.floor(Math.min(parent.clientWidth / l.cols, parent.clientHeight / ROWS));
+      this.layout = LAYOUTS.reduce((best, l) => (fit(l) > fit(best) ? l : best));
+      const c = Math.max(12, fit(this.layout));
+      const COLS = this.layout.cols;
       const dpr = window.devicePixelRatio || 1;
       this.c = c;
+      this.skins.clear();
       this.canvas.style.width = COLS * c + 'px';
       this.canvas.style.height = ROWS * c + 'px';
       this.canvas.width = Math.round(COLS * c * dpr);
@@ -201,20 +218,42 @@
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    get fx() { return (this.side + 1) * this.c; }
+    get side() { return this.layout.side; }
+    get fx() { return (this.layout.name === 'right' ? 0.4 : this.side + 1) * this.c; }
     get fy() { return 0.5 * this.c + HIDDEN_SHOWN * this.c; }
+
+    // Where the hold box, next queue and marathon stats go (pixels).
+    panels(game) {
+      const c = this.c, sw = this.side * c;
+      if (this.layout.name === 'right') {
+        const x = this.fx + W * c + 0.4 * c;
+        const p = { sw, holdX: x, holdLabelY: 0.9 * c, holdY: 1.4 * c, holdH: 2.4 * c, nextX: x, nextLabelY: 4.4 * c, nextY: 4.9 * c, slot: 1.9 * c, statsX: x, statsStep: 1.55 * c };
+        p.statsY = p.nextY + game.preview * p.slot + 1.0 * c;
+        return p;
+      }
+      return { sw, holdX: 0.5 * c, holdLabelY: 0.9 * c, holdY: 1.4 * c, holdH: 3 * c, nextX: this.fx + W * c + 0.5 * c, nextLabelY: 0.9 * c, nextY: 1.4 * c, slot: 2.6 * c, statsX: 0.5 * c, statsY: 7.4 * c, statsStep: 1.7 * c };
+    }
 
     cell(x, y, color, size, alpha) {
       const ctx = this.ctx;
       const s = size || this.c;
       ctx.globalAlpha = alpha == null ? 1 : alpha;
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, s, s);
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.fillRect(x, y, s, s * 0.14);
-      ctx.fillStyle = 'rgba(0,0,0,0.22)';
-      ctx.fillRect(x, y + s * 0.86, s, s * 0.14);
+      ctx.drawImage(this.block(color, s), x, y, s, s);
       ctx.globalAlpha = 1;
+    }
+
+    // A block in the current skin, drawn once per color and size at device resolution.
+    block(color, s) {
+      const key = this.skin + '|' + color + '|' + s;
+      let img = this.skins.get(key);
+      if (!img) {
+        const px = Math.max(1, Math.round(s * (window.devicePixelRatio || 1)));
+        img = document.createElement('canvas');
+        img.width = img.height = px;
+        (SKINS[this.skin] || SKINS.classic)(img.getContext('2d'), px, color);
+        this.skins.set(key, img);
+      }
+      return img;
     }
 
     fieldCell(x, y, color, alpha) {
@@ -257,7 +296,7 @@
       const ctx = this.ctx, c = this.c, fx = this.fx, fy = this.fy;
       const now = performance.now(), dt = Math.min(100, now - this.lastDraw);
       this.lastDraw = now;
-      for (const e of game.events.splice(0)) this.effect(e, game.g);
+      if (game.g.skin !== this.skin) { this.skin = game.g.skin; this.skins.clear(); }
       ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       const [sx, sy] = this.shakeOffset(now);
       ctx.save();
@@ -348,24 +387,24 @@
       }
 
       // Hold.
-      this.text('HOLD', 0.5 * c, 0.9 * c, c * 0.55, '#8b93a3');
+      const P = this.panels(game), sw = P.sw;
+      this.text('HOLD', P.holdX, P.holdLabelY, c * 0.55, '#8b93a3');
       ctx.fillStyle = '#15171c';
-      const sw = this.side * c, mid = 0.5 * c + sw / 2;
-      ctx.fillRect(0.5 * c, 1.4 * c, sw, 3 * c);
-      if (game.hold) this.mini(game.hold, 0.5 * c, 1.4 * c, sw, 3 * c, game.holdUsed ? 0.35 : 1);
-      if (!game.g.hold) this.text('off', mid, 2.9 * c, c * 0.5, '#555c69', 'center');
+      ctx.fillRect(P.holdX, P.holdY, sw, P.holdH);
+      if (game.hold) this.mini(game.hold, P.holdX, P.holdY, sw, P.holdH, game.holdUsed ? 0.35 : 1);
+      if (!game.g.hold) this.text('off', P.holdX + sw / 2, P.holdY + P.holdH / 2, c * 0.5, '#555c69', 'center');
 
       // Next queue (the whole drill queue is finite).
-      const nx = fx + W * c + 0.5 * c;
-      this.text('NEXT', nx, 0.9 * c, c * 0.55, '#8b93a3');
+      const nx = P.nextX;
+      this.text('NEXT', nx, P.nextLabelY, c * 0.55, '#8b93a3');
       ctx.fillStyle = '#15171c';
       const shown = game.queue.slice(0, game.preview);
-      ctx.fillRect(nx, 1.4 * c, sw, Math.max(1, shown.length) * 2.6 * c + 0.4 * c);
-      shown.forEach((t, i) => this.mini(t, nx, 1.6 * c + i * 2.6 * c, sw, 2.4 * c));
-      if (!shown.length && game.phase === 'play') this.text('—', nx + sw / 2, 2.7 * c, c * 0.6, '#555c69', 'center');
-      if (!game.marathon && game.queue.length > 6) this.text('+' + (game.queue.length - 6) + ' more', nx, 1.4 * c + 6 * 2.6 * c + 1 * c, c * 0.45, '#8b93a3');
+      ctx.fillRect(nx, P.nextY, sw, Math.max(1, shown.length) * P.slot + 0.4 * c);
+      shown.forEach((t, i) => this.mini(t, nx, P.nextY + 0.2 * c + i * P.slot, sw, P.slot - 0.2 * c));
+      if (!shown.length && game.phase === 'play') this.text('—', nx + sw / 2, P.nextY + 1.3 * c, c * 0.6, '#555c69', 'center');
+      if (!game.marathon && game.queue.length > 6) this.text('+' + (game.queue.length - 6) + ' more', nx, P.nextY + 6 * P.slot + 1 * c, c * 0.45, '#8b93a3', 'left', 600, sw);
 
-      // Marathon: level, lines, score and time under the hold box.
+      // Marathon: level, lines, score and time (under the hold box, or under the queue in the 'right' layout).
       const m = game.mara;
       if (m) {
         const rows = [
@@ -376,9 +415,9 @@
           ['PPS', m.time > 0 ? (m.pieces / (m.time / 1000)).toFixed(2) : '0.00'],
         ];
         rows.forEach(([label, value], i) => {
-          const y = 7.4 * c + i * 1.7 * c;
-          this.text(label, 0.5 * c, y, c * 0.42, '#8b93a3', 'left', 600, sw);
-          this.text(value, 0.5 * c, y + 0.65 * c, c * 0.6, '#e8ebf1', 'left', 700, sw);
+          const y = P.statsY + i * P.statsStep;
+          this.text(label, P.statsX, y, c * 0.42, '#8b93a3', 'left', 600, sw);
+          this.text(value, P.statsX, y + 0.65 * c, c * 0.6, '#e8ebf1', 'left', 700, sw);
         });
       }
 
@@ -399,6 +438,94 @@
       }
     }
   }
+
+  // Block skins: draw one block of `color` filling a p x p canvas.
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  const SKINS = {
+    // Flat with a light top edge and a dark bottom edge.
+    classic(ctx, p, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, p, p);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(0, 0, p, p * 0.14);
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.fillRect(0, p * 0.86, p, p * 0.14);
+    },
+    // Plain squares with a thin gap between them.
+    flat(ctx, p, color) {
+      const g = Math.max(1, Math.round(p * 0.05));
+      ctx.fillStyle = color;
+      ctx.fillRect(g, g, p - 2 * g, p - 2 * g);
+    },
+    // Raised: light top and left bevels, dark right and bottom ones.
+    bevel(ctx, p, color) {
+      const b = p * 0.17;
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, p, p);
+      const side = (pts, fill) => {
+        ctx.beginPath();
+        pts.forEach(([x, y]) => ctx.lineTo(x, y));
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+      };
+      side([[0, 0], [p, 0], [p - b, b], [b, b]], 'rgba(255,255,255,0.4)');
+      side([[0, 0], [b, b], [b, p - b], [0, p]], 'rgba(255,255,255,0.2)');
+      side([[p, 0], [p, p], [p - b, p - b], [p - b, b]], 'rgba(0,0,0,0.25)');
+      side([[0, p], [b, p - b], [p - b, p - b], [p, p]], 'rgba(0,0,0,0.42)');
+    },
+    // Rounded and shiny.
+    glossy(ctx, p, color) {
+      const g = p * 0.05, r = p * 0.2;
+      roundRect(ctx, g, g, p - 2 * g, p - 2 * g, r);
+      ctx.fillStyle = color;
+      ctx.fill();
+      const grad = ctx.createLinearGradient(0, 0, 0, p);
+      grad.addColorStop(0, 'rgba(255,255,255,0.35)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.3)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      roundRect(ctx, p * 0.18, p * 0.12, p * 0.64, p * 0.26, p * 0.12);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
+    },
+    // 8-bit: dark outline and a pixel highlight in the corner.
+    retro(ctx, p, color) {
+      const u = p / 8, q = (v) => Math.round(v);
+      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      ctx.fillRect(0, 0, p, p);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, q(7 * u), q(7 * u));
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillRect(q(u), q(u), q(u), q(u));
+      ctx.fillRect(q(2 * u), q(u), q(2 * u), q(u));
+      ctx.fillRect(q(u), q(2 * u), q(u), q(u));
+    },
+    // Glowing outline on a dim fill.
+    neon(ctx, p, color) {
+      const lw = Math.max(1.5, p * 0.09), g = p * 0.1;
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = color;
+      ctx.fillRect(g, g, p - 2 * g, p - 2 * g);
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = p * 0.25;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lw;
+      roundRect(ctx, g, g, p - 2 * g, p - 2 * g, p * 0.12);
+      ctx.stroke();
+      ctx.stroke();
+    },
+  };
 
   // Scales a color's HSL saturation and lightness.
   function tone(hex, sat, light) {

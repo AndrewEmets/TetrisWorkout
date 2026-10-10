@@ -73,7 +73,7 @@
       this.stale = new Set(); // actions held from before the current piece appeared: ignored until released
       this.pieceId = 0; // counts spawned pieces (touch gestures that started before a new piece are dropped)
       this.touching = false; // a finger is on the play area
-      this.events = []; // visual effects for the renderer: drop, bump, lock, clear (drained every frame)
+      this.listeners = []; // effects and sounds: fn(event) for move, rotate, hold, land, bump, drop, lock, clear, score, result
       this.bumped = 0; // direction the piece last bumped into a wall or the stack (one bump per push)
       this.stats = loadStats();
       this.marathonStats = loadMarathon(); // best results per marathon config: { games, score, lines, time }
@@ -246,6 +246,7 @@
       this.resultNext = 'new';
       this.resultTimer = this.g.successDelay;
       this.flash = { text: name, sub: this.hintUsed ? 'cleared with hint' : sub || 'Nice!', color: '#58c45a' };
+      this.emit({ kind: 'result', ok: true });
       this.record(true);
       this.prefetch(); // no-op when the next drill is already ready or being generated
     }
@@ -255,6 +256,7 @@
       this.resultNext = 'retry';
       this.resultTimer = this.g.failDelay;
       this.flash = { text: 'MISS', sub: reason, color: '#e05050' };
+      this.emit({ kind: 'result', ok: false });
       this.piece = null;
       this.record(false);
     }
@@ -328,6 +330,7 @@
       this.hold = cur;
       this.holdUsed = true;
       this.haptic('hold');
+      this.emit({ kind: 'hold' });
       this.spawn(next);
     }
 
@@ -340,10 +343,11 @@
       try { navigator.vibrate(p); } catch (e) { /* not allowed yet */ }
     }
 
+    listen(fn) { this.listeners.push(fn); }
+
     emit(e) {
       e.t = performance.now();
-      this.events.push(e);
-      if (this.events.length > 64) this.events.shift();
+      for (const fn of this.listeners) fn(e);
     }
 
     grounded() {
@@ -370,6 +374,7 @@
       this.spin = 'none';
       this.lockReset();
       this.haptic('move');
+      this.emit({ kind: 'move' });
       return true;
     }
 
@@ -379,7 +384,7 @@
       p.y++;
       this.spin = 'none';
       if (p.y > this.lowestY) { this.lowestY = p.y; this.lockResets = 0; this.lockTimer = 0; }
-      if (this.grounded()) this.haptic('land');
+      if (this.grounded()) { this.haptic('land'); this.emit({ kind: 'land' }); }
       return true;
     }
 
@@ -392,6 +397,7 @@
       this.lockReset();
       this.applyDCD();
       this.haptic('rotate');
+      this.emit({ kind: 'rotate', spin: this.spin });
       return true;
     }
 
@@ -440,8 +446,8 @@
       else this.haptic(hard ? 'hardDrop' : 'lock');
       const name = TW.Spin.describe(p.type, spin, lines);
       this.lastClear = name || pc ? { text: name, pc, type: p.type, spin, lines, notes: [], t: performance.now() } : null;
-      this.emit({ kind: 'lock', cells, type: p.type });
-      if (lines) this.emit({ kind: 'clear', rows: full, pc });
+      this.emit({ kind: 'lock', cells, type: p.type, hard: !!hard });
+      if (lines || spin !== 'none') this.emit({ kind: 'clear', rows: full, pc, lines, spin, type: p.type });
 
       const goal = this.drill.goal;
       if (goal.kind === 'marathon') return this.marathonLock(p, spin, lines, pc);
@@ -549,6 +555,7 @@
       m.level = m.startLevel + Math.floor(m.lines / this.settings.data.marathon.linesPerLevel);
       if (this.lastClear) this.lastClear.notes.push(...notes);
       if (m.level > level && this.lastClear) this.lastClear.level = m.level;
+      if (lines) this.emit({ kind: 'score', combo: m.combo, b2b: notes.includes('B2B'), levelUp: m.level > level });
       if (m.target && m.lines >= m.target) return this.marathonOver(true);
       if (!lines && !this.addGarbage()) return this.marathonOver(false, 'Garbage pushed the stack out');
       this.spawnNext();
@@ -567,6 +574,7 @@
       if (done && (!best.time || m.time < best.time)) best.time = m.time;
       try { localStorage.setItem(MARATHON_KEY, JSON.stringify(this.marathonStats)); } catch (e) { /* ignore */ }
       const sub = m.score.toLocaleString('en-US') + ' points · ' + m.lines + ' lines' + (newBest ? ' · new best!' : '');
+      this.emit({ kind: 'result', ok: done, over: true });
       this.flash = done
         ? { text: 'COMPLETE', sub, color: '#58c45a' }
         : { text: 'GAME OVER', sub: (reason ? reason + ' · ' : '') + sub, color: '#e05050' };

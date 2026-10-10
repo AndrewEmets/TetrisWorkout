@@ -37,8 +37,9 @@
     game: {
       gravity: 0, lockDelay: 30, lockResets: 15,
       hold: true, holdShuffle: 30, ghost: true, showTarget: true, successDelay: 500, failDelay: 800,
-      effects: true, shake: true,
+      effects: true, shake: true, skin: 'classic',
     },
+    audio: { volume: 50, moves: true },
     drill: { scenario: 'T', type: 'double', setup: 0 },
     // Last selection in each mode, restored when switching back to it.
     modes: {
@@ -77,14 +78,21 @@
       { path: 'game.successDelay', label: 'Pause after success', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'game.failDelay', label: 'Pause after miss', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'controls.deadzone', label: 'Gamepad stick deadzone', min: 0.1, max: 0.9, step: 0.05, unit: '' },
-      { heading: 'Visuals' },
-      { path: 'game.effects', label: 'Effects', hint: 'Drop trails, line clear flashes and particles', type: 'bool' },
-      { path: 'game.shake', label: 'Board shake', hint: 'On hard drops and when the piece bumps into a wall', type: 'bool' },
       { heading: 'Marathon' },
       { path: 'marathon.linesPerLevel', label: 'Lines per level', min: 1, max: 50, step: 1, unit: '' },
       { path: 'marathon.gStart', label: 'Gravity at level 1', hint: 'Cells per frame (0.0167 G = 1 row per second)', min: 0.005, max: 1, step: 0.005, unit: 'G' },
       { path: 'marathon.gMax', label: 'Top gravity', hint: '20 G drops pieces to the floor instantly', min: 0.1, max: 20, step: 0.1, unit: 'G' },
       { path: 'marathon.maxLevel', label: 'Level with top gravity', hint: 'Gravity is multiplied by the same factor every level until this one (even steps on a log scale)', min: 2, max: 40, step: 1, unit: '' },
+    ],
+    look: [
+      { heading: 'Blocks' },
+      { path: 'game.skin', label: 'Block style', type: 'select', options: [['classic', 'Classic'], ['flat', 'Flat'], ['bevel', 'Bevel'], ['glossy', 'Glossy'], ['retro', 'Retro'], ['neon', 'Neon']] },
+      { heading: 'Effects' },
+      { path: 'game.effects', label: 'Effects', hint: 'Drop trails, line clear flashes and particles', type: 'bool' },
+      { path: 'game.shake', label: 'Board shake', hint: 'On hard drops and when the piece bumps into a wall', type: 'bool' },
+      { heading: 'Sound' },
+      { path: 'audio.volume', label: 'Volume', hint: '0 = off', min: 0, max: 100, step: 5, unit: '%' },
+      { path: 'audio.moves', label: 'Move and rotate sounds', hint: 'Clicks on every move and rotation (spins still chime)', type: 'bool' },
     ],
     touch: [
       { heading: 'Moving' },
@@ -232,6 +240,7 @@
       this.renderControls();
       this.renderFields('handling');
       this.renderFields('game');
+      this.renderFields('look');
       this.renderFields('touch');
       document.getElementById('io-text').value = Settings.exportJSON();
     },
