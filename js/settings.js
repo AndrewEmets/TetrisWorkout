@@ -37,7 +37,7 @@
     game: {
       gravity: 0, lockDelay: 30, lockResets: 15,
       hold: true, holdShuffle: 30, ghost: true, showTarget: true, successDelay: 500, failDelay: 800,
-      effects: true, shake: true, skin: 'classic',
+      effects: true, shake: true, skin: 'classic', showCenter: false,
     },
     audio: { volume: 50, moves: true },
     drill: { scenario: 'T', type: 'double', setup: 0 },
@@ -87,6 +87,7 @@
     look: [
       { heading: 'Blocks' },
       { path: 'game.skin', label: 'Block style', type: 'select', options: [['classic', 'Classic'], ['flat', 'Flat'], ['bevel', 'Bevel'], ['glossy', 'Glossy'], ['retro', 'Retro'], ['neon', 'Neon']] },
+      { path: 'game.showCenter', label: 'Show the rotation center', hint: 'A dot on the point the piece turns around (also on the ghost)', type: 'bool' },
       { heading: 'Effects' },
       { path: 'game.effects', label: 'Effects', hint: 'Drop trails, line clear flashes and particles', type: 'bool' },
       { path: 'game.shake', label: 'Board shake', hint: 'On hard drops and when the piece bumps into a wall', type: 'bool' },

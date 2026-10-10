@@ -10,8 +10,8 @@
   const FIRST_ROW = H - VISIBLE - HIDDEN_SHOWN;
   const ROWS = 23.5;
   // Layouts (sizes in cells): 'side' has hold on the left and next on the right of the field (hold + field + next
-  // + margins); 'right' puts hold, next and stats in one column on the right, so on a narrow (phone) screen the
-  // field gets more of the width. resize() picks whichever gives the bigger field.
+  // + margins); 'right' puts next, stats and hold (at the bottom, apart from the queue) in one column on the right,
+  // so on a narrow (phone) screen the field gets more of the width. resize() picks whichever gives the bigger field.
   const LAYOUTS = [
     { name: 'side', side: 4.5, cols: 2 * 4.5 + 12 },
     { name: 'side', side: 3, cols: 2 * 3 + 12 },
@@ -226,8 +226,8 @@
     panels(game) {
       const c = this.c, sw = this.side * c;
       if (this.layout.name === 'right') {
-        const x = this.fx + W * c + 0.4 * c;
-        const p = { sw, holdX: x, holdLabelY: 0.9 * c, holdY: 1.4 * c, holdH: 2.4 * c, nextX: x, nextLabelY: 4.4 * c, nextY: 4.9 * c, slot: 1.9 * c, statsX: x, statsStep: 1.55 * c };
+        const x = this.fx + W * c + 0.4 * c, holdH = 2.4 * c, holdY = this.fy + VISIBLE * c - holdH;
+        const p = { sw, holdX: x, holdLabelY: holdY - 0.5 * c, holdY, holdH, nextX: x, nextLabelY: 0.9 * c, nextY: 1.4 * c, slot: 1.9 * c, statsX: x, statsStep: 1.45 * c };
         p.statsY = p.nextY + game.preview * p.slot + 1.0 * c;
         return p;
       }
@@ -258,6 +258,22 @@
 
     fieldCell(x, y, color, alpha) {
       this.cell(this.fx + x * this.c, this.rowY(y), color, this.c, alpha);
+    }
+
+    // A dot on the piece's rotation center (the middle of its SRS box; for O, the middle of the O).
+    center(p, y, alpha) {
+      const ctx = this.ctx, c = this.c, n = p.type === 'I' ? 4 : 3;
+      const cx = p.type === 'O' ? p.x + 2 : p.x + n / 2, cy = (p.type === 'O' ? y + 1 : y + n / 2) - FIRST_ROW - HIDDEN_SHOWN;
+      if (cy < -HIDDEN_SHOWN) return;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(this.fx + cx * c, this.fy + cy * c, Math.max(2.5, c * 0.13), 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, c * 0.05);
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     outline(cells, color, dashed) {
@@ -359,12 +375,16 @@
       // Ghost and active piece.
       const p = game.piece;
       if (p) {
+        let gy = p.y;
+        while (b.fits(p.type, p.rot, p.x, gy + 1)) gy++;
         if (game.g.ghost) {
-          let gy = p.y;
-          while (b.fits(p.type, p.rot, p.x, gy + 1)) gy++;
           for (const [x, y] of cellsOf({ ...p, y: gy })) this.fieldCell(x, y, ACTIVE[p.type], 0.25);
         }
         for (const [x, y] of cellsOf(p)) if (y >= FIRST_ROW) this.fieldCell(x, y, ACTIVE[p.type]);
+        if (game.g.showCenter) {
+          if (game.g.ghost) this.center(p, gy, 0.4);
+          this.center(p, p.y, 1);
+        }
       }
       this.drawFlashes(now);
       this.drawParticles(dt);

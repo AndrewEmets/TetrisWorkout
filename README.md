@@ -81,8 +81,8 @@ The gestures are covered by tests: `node tools/test-touch.js` (the pre-commit ho
 
 On a phone the toolbar folds under the ☰ button; retry and next stay next to it. The board area fills the
 screen and takes gestures everywhere, even around the board; the goal, guide and stats open with the ℹ button.
-On narrow screens hold, next and the Marathon stats move into one column right of the field, so the field gets
-more of the width.
+On narrow screens next, the Marathon stats and hold (at the bottom, level with the floor) move into one column
+right of the field, so the field gets more of the width.
 
 ## Mechanics
 
@@ -102,7 +102,8 @@ Under ⚙ Settings you can:
 - rebind the keyboard and gamepad
 - adjust handling timings
 - change game options
-- in **Look & sound**: pick a block style (Classic, Flat, Bevel, Glossy, Retro, Neon), turn off the visual effects
+- in **Look & sound**: pick a block style (Classic, Flat, Bevel, Glossy, Retro, Neon), show a dot on the piece's
+  rotation center, turn off the visual effects
   (drop trails, line clear flashes and particles) or the board shake, and set the volume of the retro sound
   effects (synthesized in the browser; 0 turns them off) or mute just the move / rotate clicks
 - import and export your settings as JSON
