@@ -5,11 +5,11 @@
 const path = require('path');
 global.window = { TW: {} };
 require(path.join(__dirname, '..', 'js', 'touch.js'));
-const { Gesture } = window.TW.Touch;
+const { Gesture, tapZone } = window.TW.Touch;
 
 const DEFAULTS = {
   touchSlow: 1.5, touchFast: 0.6, touchFastSpeed: 20, touchVibrate: false, touchWallFlick: false,
-  touchRotateSwap: false, touchSlideDeadzone: 1,
+  touchRotateSwap: false, touchTap180: true, touchSlideDeadzone: 1,
 };
 
 // A fake game: the piece's column (0..7 like a T), whether soft drop is held, and every action in order.
@@ -25,14 +25,14 @@ function setup(cfg) {
     },
     press(a) { s.log.push(a); },
     softDrop(on) { s.soft = on; s.softEver = s.softEver || on; s.log.push(on ? 'soft+' : 'soft-'); },
-    buzz() {},
     pieceId() { return s.piece; },
   };
   return { s, conf, env };
 }
 
 // Plays a finger path: points [time ms, x, y] in cells, sampled every 8 ms along straight lines between them.
-// opts.end: 'up' (default), 'cancel' or 'none'; opts.left: release on the left half; opts.at: { time: fn(s) }.
+// opts.end: 'up' (default), 'cancel' or 'none'; opts.zone: tap sector at release ('left' by default);
+// opts.at: { time: fn(s) }.
 function play(points, opts = {}) {
   const { s, conf, env } = setup(opts.cfg);
   const [t0, x0, y0] = points[0];
@@ -51,7 +51,7 @@ function play(points, opts = {}) {
   }
   const [te, xe, ye] = last;
   if (opts.end === 'cancel') g.cancel();
-  else if (opts.end !== 'none') g.end(te + 1, xe, ye, opts.left !== false);
+  else if (opts.end !== 'none') g.end(te + 1, xe, ye, opts.zone || 'left');
   s.moved = s.col - 3;
   return s;
 }
@@ -67,10 +67,14 @@ const has = (s, a) => s.log.includes(a);
 
 console.log('Touch gestures');
 
-test('tap on the left rotates CW, on the right CCW', () => {
+test('tap sectors (a Y around the center): top 180, lower left CW, lower right CCW', () => {
+  eq([tapZone(0, -100), tapZone(-150, -100), tapZone(150, -100), tapZone(-200, -100), tapZone(-1, 50), tapZone(1, 50)],
+    ['top', 'top', 'top', 'left', 'left', 'right'], 'sectors');
   eq(play([[0, 5, 5], [100, 5.1, 5.1]]).log, ['rotCW'], 'left');
-  eq(play([[0, 5, 5], [100, 5.1, 5.1]], { left: false }).log, ['rotCCW'], 'right');
+  eq(play([[0, 5, 5], [100, 5.1, 5.1]], { zone: 'right' }).log, ['rotCCW'], 'right');
+  eq(play([[0, 5, 5], [100, 5.1, 5.1]], { zone: 'top' }).log, ['rot180'], 'top');
   eq(play([[0, 5, 5], [100, 5, 5]], { cfg: { touchRotateSwap: true } }).log, ['rotCCW'], 'swapped');
+  eq(play([[0, 5, 5], [100, 5, 5]], { zone: 'top', cfg: { touchTap180: false } }).log, ['rotCW'], 'top off: by side');
 });
 
 test('a long press or a small drag is not a tap', () => {

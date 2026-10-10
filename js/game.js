@@ -14,6 +14,15 @@
   const SCORE_MINI = [100, 200, 400, 800, 800];
   const SCORE_PC = [0, 800, 1200, 1800, 2000];
 
+  // Vibration patterns (ms on / off) for piece actions; line clears buzz once per line.
+  const HAPTICS = {
+    move: 6, rotate: 10, hold: [10, 40, 10], soft: 8, land: 12, lock: 15, hardDrop: 25,
+    pc: [60, 40, 60, 40, 140],
+  };
+  // Phones and tablets that can vibrate (Android; iOS doesn't let web pages vibrate).
+  const CAN_VIBRATE = typeof navigator !== 'undefined' && !!navigator.vibrate &&
+    typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
   function loadMarathon() {
     try {
       const s = JSON.parse(localStorage.getItem(MARATHON_KEY));
@@ -315,7 +324,16 @@
       const next = this.hold || this.queue.shift();
       this.hold = cur;
       this.holdUsed = true;
+      this.haptic('hold');
       this.spawn(next);
+    }
+
+    // Vibrates for a piece action (touch devices, when enabled in Settings -> Touch).
+    haptic(kind, lines) {
+      if (!CAN_VIBRATE || !this.settings.data.controls.touchVibrate) return;
+      let p = HAPTICS[kind];
+      if (kind === 'clear') p = [].concat(...Array.from({ length: lines }, (_, i) => (i ? [40, 30] : [30])));
+      try { navigator.vibrate(p); } catch (e) { /* not allowed yet */ }
     }
 
     grounded() {
@@ -336,6 +354,7 @@
       p.x += d;
       this.spin = 'none';
       this.lockReset();
+      this.haptic('move');
       return true;
     }
 
@@ -345,6 +364,7 @@
       p.y++;
       this.spin = 'none';
       if (p.y > this.lowestY) { this.lowestY = p.y; this.lockResets = 0; this.lockTimer = 0; }
+      if (this.grounded()) this.haptic('land');
       return true;
     }
 
@@ -356,6 +376,7 @@
       if (r.y > this.lowestY) { this.lowestY = r.y; this.lockResets = 0; }
       this.lockReset();
       this.applyDCD();
+      this.haptic('rotate');
       return true;
     }
 
@@ -371,10 +392,10 @@
       while (this.board.fits(this.piece.type, this.piece.rot, this.piece.x, this.piece.y + 1)) { this.piece.y++; moved++; }
       if (moved) this.spin = 'none';
       if (this.mara) this.mara.score += 2 * moved;
-      this.lockPiece();
+      this.lockPiece(true);
     }
 
-    lockPiece() {
+    lockPiece(hard) {
       const p = this.piece;
       const spin = this.spin;
       const cells = TW.Pieces.cellsOf(p);
@@ -384,6 +405,9 @@
       this.locks++;
       this.changed = true;
       const pc = this.board.isEmpty();
+      if (pc) this.haptic('pc');
+      else if (lines) this.haptic('clear', lines);
+      else this.haptic(hard ? 'hardDrop' : 'lock');
       const name = TW.Spin.describe(p.type, spin, lines);
       this.lastClear = { text: pc ? (name ? name + ' + PC' : 'PERFECT CLEAR') : name, t: performance.now() };
 
@@ -658,6 +682,7 @@
         case 'hold': this.doHold(); break;
         case 'hardDrop': if (performance.now() >= this.guardUntil) this.hardDrop(); break;
         case 'softDrop':
+          this.haptic('soft');
           if (this.h.sdf >= 41) while (this.stepDown());
           else this.stepDown();
           this.softAcc = 0;

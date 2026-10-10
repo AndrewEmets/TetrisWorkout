@@ -247,4 +247,6 @@ button.star.on { color: #ffd75a; border-color: #8a7330; }
   .field > * { min-width: 0; }
   .field input[type="range"] { grid-column: 1 / -1; }
   .field small { grid-column: 1 / -1; margin-top: 0; }
+  .tabs { flex-shrink: 0; padding: 8px 8px 0; overflow-x: auto; scrollbar-width: none; }
+  .tabs button { flex-shrink: 0; white-space: nowrap; padding: 5px 10px; }
 }

@@ -56,20 +56,21 @@ On a phone or tablet, play on the board area:
 - **Drag left / right:** move the piece. Slow drags take more finger travel per column (1.5 cells), so short
   moves are easy to stop on the right column; fast drags take less (0.6 cells), to cross the board quickly.
   Going back after a step takes only half a cell, so an overshoot is easy to fix.
-  On Android each step also gives a short vibration. Optionally a fast sideways flick, released mid-motion,
-  sends the piece to the wall. All of it is adjustable in ⚙ Settings → Game.
+  Optionally a fast sideways flick, released mid-motion, sends the piece to the wall.
 - **Drag down and keep the finger down:** soft drop, like holding the soft drop key; move back up to stop.
   It also works in the middle of a sideways drag. Moving sideways while soft dropping slides the piece and
   pauses the drop (moving down again resumes it), so the piece never falls diagonally and you can slide it
   under an overhang without lifting the finger. The first sideways step there needs a little extra travel
-  (a dead zone, adjustable in ⚙ Settings → Game) so the piece doesn't shift by accident.
+  (a dead zone, adjustable in ⚙ Settings → Touch) so the piece doesn't shift by accident.
 - **Swipe down fast and let go:** hard drop. **Swipe up:** hold; after a sideways drag, swipe up and let go.
   Each movement counts only along its own direction (sideways, down or up, within 35°), so drift during a
   swipe doesn't move the piece and a diagonal drag does nothing.
-- **Tap the left / right half of the screen:** rotate CW / CCW.
+- **Tap:** the play area is split like a Y around its center. Tap the top sector to rotate 180°, the lower
+  left one to rotate CW and the lower right one CCW.
+- **Haptics** (Android): moves, rotations, hold, soft drop, landing, hard drop and line clears vibrate.
 - With gravity on, a landed piece doesn't lock while your finger is on the screen, so there is time to lift
-  it and tap a spin (lock delay starts after you lift; it can be turned off in ⚙ Settings → Game).
-  ⚙ Settings → Game can swap the taps and change how far a drag moves the piece.
+  it and tap a spin (lock delay starts after you lift; it can be turned off in ⚙ Settings → Touch).
+  All touch options (drag distances, taps, haptics…) are in ⚙ Settings → Touch.
 
 The gestures are covered by tests: `node tools/test-touch.js` (the pre-commit hook runs them).
 

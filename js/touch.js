@@ -24,8 +24,10 @@
 //   diagonal -> nothing: a slanted drag neither moves nor drops the piece.
 //
 // Lifting the finger:
-//   - without having moved TAP_CELLS, within TAP_MS: a tap -> rotate (left half of the screen CW, right half
-//     CCW; swappable). It happens on release, since only then is it clear the touch wasn't a drag.
+//   - without having moved TAP_CELLS, within TAP_MS: a tap -> rotate. The play area is split like a Y around
+//     its center: the top sector (within TOP_HALF_ANGLE of straight up) rotates 180°, the lower left one CW,
+//     the lower right one CCW (left / right swappable; the 180° sector can be turned off). It happens on
+//     release, since only then is it clear the touch wasn't a drag.
 //   - during a fast swipe (FLICK_CELLS within FLICK_WINDOW, at FLICK_SPEED or faster):
 //       down -> hard drop. Sideways steps made during the swipe are undone first, so it drops where it started.
 //       up -> hold (also after sideways moves, e.g. drag right, then swipe up and let go).
@@ -39,7 +41,7 @@
 //   - A gesture that started before the current piece appeared (the last one locked or was held) is ignored
 //     until the finger lifts, so a swipe can't also hard drop the next piece.
 //   - While a finger is down the game's lock delay waits (game.touching), so there is time to lift and tap a spin.
-//   - Each sideways step vibrates on Android (touchVibrate).
+//   - Vibration for moves, rotations, drops and line clears comes from the game (game.haptic).
 (function (TW) {
   'use strict';
 
@@ -57,11 +59,18 @@
   const FLICK_CELLS = 2.5; // a down / up swipe covers at least this many cells within the window...
   const WALL_CELLS = 2; // ...a sideways one at least this many...
   const FLICK_SPEED = 0.06; // ...at this speed or faster (cells per ms)
+  const TOP_HALF_ANGLE = 60; // degrees: the 180° tap sector spans 60° either side of straight up from the center
   const SRC = 'touch'; // input source id for the held soft drop
+
+  // Which tap sector (dx, dy) from the center of the play area is in: 'top', 'left' or 'right'.
+  function tapZone(dx, dy) {
+    if (dy < 0 && Math.abs(dx) <= -dy * Math.tan(TOP_HALF_ANGLE * Math.PI / 180)) return 'top';
+    return dx < 0 ? 'left' : 'right';
+  }
 
   class Gesture {
     // cfg(): the touch settings (settings.data.controls).
-    // env: { shift(d) -> whether the piece moved, press(action), softDrop(on), buzz(), pieceId() }
+    // env: { shift(d) -> whether the piece moved, press(action), softDrop(on), pieceId() }
     constructor(cfg, env, time, x, y) {
       this.cfg = cfg;
       this.env = env;
@@ -141,7 +150,7 @@
         this.anchor += d * need;
         this.stepDir = d;
         this.dead = 0;
-        if (this.env.shift(d)) { this.steps.push([time, d]); this.env.buzz(); }
+        if (this.env.shift(d)) this.steps.push([time, d]);
       }
     }
 
@@ -163,18 +172,20 @@
       if (!this.held && !this.sideSeen && !this.dropSeen && this.rise >= HOLD_CELLS) { this.held = true; this.env.press('hold'); }
     }
 
-    // leftHalf: the touch ended on the left half of the screen (which way a tap rotates).
-    end(time, x, y, leftHalf) {
+    // zone: the tap sector the touch ended in ('top' | 'left' | 'right', see tapZone).
+    end(time, x, y, zone) {
       this.setSoft(false);
       if (this.stale) return;
       const c = this.cfg();
-      if (!this.moved && time - this.t0 < TAP_MS) { this.env.press(leftHalf !== c.touchRotateSwap ? 'rotCW' : 'rotCCW'); return; }
+      if (!this.moved && time - this.t0 < TAP_MS) {
+        if (zone === 'top' && c.touchTap180) this.env.press('rot180');
+        else this.env.press((zone === 'right') === c.touchRotateSwap ? 'rotCW' : 'rotCCW');
+        return;
+      }
       if (c.touchWallFlick) {
         for (const d of [-1, 1]) {
           if (this.swipe(time, x, y, 'x', d, WALL_CELLS, 0.5) === null) continue;
-          let moved = false;
-          while (this.env.shift(d)) moved = true;
-          if (moved) this.env.buzz();
+          while (this.env.shift(d));
           return;
         }
       }
@@ -233,11 +244,6 @@
       shift: (d) => game.touchShift(d),
       press: (a) => input.onPress(a),
       softDrop: (on) => (on ? input.press('softDrop', SRC) : input.release('softDrop', SRC)),
-      buzz: () => {
-        if (cfg().touchVibrate && navigator.vibrate) {
-          try { navigator.vibrate(8); } catch (err) { /* not allowed yet */ }
-        }
-      },
       pieceId: () => game.pieceId,
     };
     let g = null, id = null; // the gesture being tracked and its pointer
@@ -262,7 +268,10 @@
       g = null;
       game.touching = false;
       if (cancelled) gesture.cancel();
-      else gesture.end(e.timeStamp, ...pos(e), e.clientX < window.innerWidth / 2);
+      else {
+        const r = el.getBoundingClientRect();
+        gesture.end(e.timeStamp, ...pos(e), tapZone(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)));
+      }
     };
     el.addEventListener('pointerup', (e) => end(e, false));
     el.addEventListener('pointercancel', (e) => end(e, true));
@@ -275,8 +284,9 @@
     const s = settings.data.controls;
     return 'Touch: drag ←/→ move (slow = precise) · drag ↓ and hold: soft drop · swipe ↓ and let go: hard drop · swipe ↑ hold (or swipe ↑ and let go after dragging ←/→)' +
       (s.touchWallFlick ? ' · flick ←/→ and let go: to the wall' : '') +
-      ' · tap left / right: rotate ' + (s.touchRotateSwap ? 'CCW / CW' : 'CW / CCW');
+      ' · tap lower left / lower right' + (s.touchTap180 ? ' / top' : '') + ': rotate ' + (s.touchRotateSwap ? 'CCW / CW' : 'CW / CCW') +
+      (s.touchTap180 ? ' / 180°' : '');
   }
 
-  TW.Touch = { attach, help, Gesture };
+  TW.Touch = { attach, help, Gesture, tapZone };
 })(window.TW);

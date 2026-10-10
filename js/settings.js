@@ -27,7 +27,7 @@
       },
       deadzone: 0.5,
       touchSlow: 1.5, touchFast: 0.6, touchFastSpeed: 20, touchVibrate: true, touchWallFlick: false,
-      touchRotateSwap: false, touchSlideDeadzone: 1, touchLockPause: true,
+      touchRotateSwap: false, touchTap180: true, touchSlideDeadzone: 1, touchLockPause: true,
     },
     handling: {
       das: 10, arr: 2, dcd: 1, sdf: 6,
@@ -76,19 +76,25 @@
       { path: 'game.successDelay', label: 'Pause after success', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'game.failDelay', label: 'Pause after miss', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'controls.deadzone', label: 'Gamepad stick deadzone', min: 0.1, max: 0.9, step: 0.05, unit: '' },
-      { path: 'controls.touchSlow', label: 'Touch: slow drag per column', hint: 'Finger travel for one column when dragging slowly (precise moves), in board cells', min: 0.5, max: 3, step: 0.1, unit: 'cells' },
-      { path: 'controls.touchFast', label: 'Touch: fast drag per column', hint: 'Finger travel for one column when dragging fast. Same as the slow value = no acceleration', min: 0.2, max: 3, step: 0.1, unit: 'cells' },
-      { path: 'controls.touchFastSpeed', label: 'Touch: fast drag speed', hint: 'Finger speed (board cells per second) from which the fast value applies; slower drags blend toward the slow value', min: 5, max: 60, step: 1, unit: 'cells/s' },
-      { path: 'controls.touchVibrate', label: 'Touch: vibrate on each sideways step', hint: 'Android only (iOS doesn\'t let web pages vibrate)', type: 'bool' },
-      { path: 'controls.touchWallFlick', label: 'Touch: sideways flick sends the piece to the wall', hint: 'A fast sideways flick, released mid-motion, moves the piece all the way', type: 'bool' },
-      { path: 'controls.touchSlideDeadzone', label: 'Touch: sideways dead zone in soft drop', hint: 'Extra finger travel before the first sideways move while soft dropping', min: 0, max: 3, step: 0.25, unit: 'cells' },
-      { path: 'controls.touchRotateSwap', label: 'Swap touch rotation (tap left = CCW, right = CW)', type: 'bool' },
-      { path: 'controls.touchLockPause', label: 'Touch: lock delay waits while a finger is down', hint: 'With gravity, a landed piece doesn\'t lock while you touch the screen, so there is time to lift the finger and tap a spin', type: 'bool' },
       { heading: 'Marathon' },
       { path: 'marathon.linesPerLevel', label: 'Lines per level', min: 1, max: 50, step: 1, unit: '' },
       { path: 'marathon.gStart', label: 'Gravity at level 1', hint: 'Cells per frame (0.0167 G = 1 row per second)', min: 0.005, max: 1, step: 0.005, unit: 'G' },
       { path: 'marathon.gMax', label: 'Top gravity', hint: '20 G drops pieces to the floor instantly', min: 0.1, max: 20, step: 0.1, unit: 'G' },
       { path: 'marathon.maxLevel', label: 'Level with top gravity', hint: 'Gravity is multiplied by the same factor every level until this one (even steps on a log scale)', min: 2, max: 40, step: 1, unit: '' },
+    ],
+    touch: [
+      { heading: 'Moving' },
+      { path: 'controls.touchSlow', label: 'Slow drag per column', hint: 'Finger travel for one column when dragging slowly (precise moves), in board cells', min: 0.5, max: 3, step: 0.1, unit: 'cells' },
+      { path: 'controls.touchFast', label: 'Fast drag per column', hint: 'Finger travel for one column when dragging fast. Same as the slow value = no acceleration', min: 0.2, max: 3, step: 0.1, unit: 'cells' },
+      { path: 'controls.touchFastSpeed', label: 'Fast drag speed', hint: 'Finger speed (board cells per second) from which the fast value applies; slower drags blend toward the slow value', min: 5, max: 60, step: 1, unit: 'cells/s' },
+      { path: 'controls.touchSlideDeadzone', label: 'Sideways dead zone in soft drop', hint: 'Extra finger travel before the first sideways move after a downward drag starts soft drop', min: 0, max: 3, step: 0.25, unit: 'cells' },
+      { path: 'controls.touchWallFlick', label: 'Sideways flick sends the piece to the wall', hint: 'A fast sideways flick, released mid-motion, moves the piece all the way', type: 'bool' },
+      { heading: 'Rotating' },
+      { path: 'controls.touchTap180', label: 'Tap the top sector to rotate 180°', hint: 'The play area is split like a Y: top = 180°, lower left = CW, lower right = CCW. Off: left / right halves only', type: 'bool' },
+      { path: 'controls.touchRotateSwap', label: 'Swap left / right (lower left = CCW, lower right = CW)', type: 'bool' },
+      { heading: 'Other' },
+      { path: 'controls.touchVibrate', label: 'Haptics', hint: 'Vibrate on moves, rotations, hold, drops and line clears (Android; iOS doesn\'t let web pages vibrate)', type: 'bool' },
+      { path: 'controls.touchLockPause', label: 'Lock delay waits while a finger is down', hint: 'With gravity, a landed piece doesn\'t lock while you touch the screen, so there is time to lift the finger and tap a spin', type: 'bool' },
     ],
   };
 
@@ -221,6 +227,7 @@
       this.renderControls();
       this.renderFields('handling');
       this.renderFields('game');
+      this.renderFields('touch');
       document.getElementById('io-text').value = Settings.exportJSON();
     },
 
