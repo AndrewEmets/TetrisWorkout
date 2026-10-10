@@ -73,6 +73,8 @@
       this.stale = new Set(); // actions held from before the current piece appeared: ignored until released
       this.pieceId = 0; // counts spawned pieces (touch gestures that started before a new piece are dropped)
       this.touching = false; // a finger is on the play area
+      this.events = []; // visual effects for the renderer: drop, bump, lock, clear (drained every frame)
+      this.bumped = 0; // direction the piece last bumped into a wall or the stack (one bump per push)
       this.stats = loadStats();
       this.marathonStats = loadMarathon(); // best results per marathon config: { games, score, lines, time }
       this.mara = null; // marathon run in progress: level, lines, score, ...
@@ -291,6 +293,7 @@
       if (!p) { if (this.mara) this.marathonOver(false, 'Top out'); else this.fail('Top out'); return; }
       this.piece = p;
       this.pieceId++;
+      this.bumped = 0;
       // Input from the previous piece doesn't move or drop this one: held keys need a new press.
       if (!this.h.carryInput) {
         for (const a of ['left', 'right', 'softDrop']) if (this.input.isHeld(a)) this.stale.add(a);
@@ -337,6 +340,12 @@
       try { navigator.vibrate(p); } catch (e) { /* not allowed yet */ }
     }
 
+    emit(e) {
+      e.t = performance.now();
+      this.events.push(e);
+      if (this.events.length > 64) this.events.shift();
+    }
+
     grounded() {
       const p = this.piece;
       return !this.board.fits(p.type, p.rot, p.x, p.y + 1);
@@ -351,8 +360,13 @@
 
     move(d) {
       const p = this.piece;
-      if (!p || !this.board.fits(p.type, p.rot, p.x + d, p.y)) return false;
+      if (!p) return false;
+      if (!this.board.fits(p.type, p.rot, p.x + d, p.y)) {
+        if (this.bumped !== d) { this.bumped = d; this.emit({ kind: 'bump', dir: d }); }
+        return false;
+      }
       p.x += d;
+      this.bumped = 0;
       this.spin = 'none';
       this.lockReset();
       this.haptic('move');
@@ -389,17 +403,22 @@
     }
 
     hardDrop() {
+      const from = TW.Pieces.cellsOf(this.piece);
       let moved = 0;
       while (this.board.fits(this.piece.type, this.piece.rot, this.piece.x, this.piece.y + 1)) { this.piece.y++; moved++; }
       if (moved) this.spin = 'none';
       if (this.mara) this.mara.score += 2 * moved;
+      this.emit({ kind: 'drop', cells: from, dist: moved, type: this.piece.type, hard: true });
       this.lockPiece(true);
     }
 
     // Sonic drop: straight to the floor without locking (lock delay and lock resets work as after a soft drop).
     sonicDrop() {
+      if (!this.piece) return;
+      const from = TW.Pieces.cellsOf(this.piece);
       let rows = 0;
       while (this.stepDown()) rows++;
+      if (rows) this.emit({ kind: 'drop', cells: from, dist: rows, type: this.piece.type, hard: false });
       this.softAcc = 0;
       if (this.mara) this.mara.score += rows;
     }
@@ -410,6 +429,8 @@
       const cells = TW.Pieces.cellsOf(p);
       this.piece = null;
       this.board.place(p);
+      const { W, H } = TW.Board, full = [];
+      for (let y = 0; y < H; y++) if (this.board.rowFull(y)) full.push({ y, cells: Array.from(this.board.cells.slice(y * W, y * W + W)) });
       const lines = this.board.clearLines();
       this.locks++;
       this.changed = true;
@@ -418,7 +439,9 @@
       else if (lines) this.haptic('clear', lines);
       else this.haptic(hard ? 'hardDrop' : 'lock');
       const name = TW.Spin.describe(p.type, spin, lines);
-      this.lastClear = { text: pc ? (name ? name + ' + PC' : 'PERFECT CLEAR') : name, t: performance.now() };
+      this.lastClear = name || pc ? { text: name, pc, type: p.type, spin, lines, notes: [], t: performance.now() } : null;
+      this.emit({ kind: 'lock', cells, type: p.type });
+      if (lines) this.emit({ kind: 'clear', rows: full, pc });
 
       const goal = this.drill.goal;
       if (goal.kind === 'marathon') return this.marathonLock(p, spin, lines, pc);
@@ -524,8 +547,8 @@
       m.score += Math.round(points * level);
       m.lines += lines;
       m.level = m.startLevel + Math.floor(m.lines / this.settings.data.marathon.linesPerLevel);
-      if (notes.length && this.lastClear.text) this.lastClear.text += ' · ' + notes.join(' · ');
-      if (m.level > level) this.lastClear = { text: 'LEVEL ' + m.level, t: this.lastClear.t };
+      if (this.lastClear) this.lastClear.notes.push(...notes);
+      if (m.level > level && this.lastClear) this.lastClear.level = m.level;
       if (m.target && m.lines >= m.target) return this.marathonOver(true);
       if (!lines && !this.addGarbage()) return this.marathonOver(false, 'Garbage pushed the stack out');
       this.spawnNext();

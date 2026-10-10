@@ -37,6 +37,7 @@
     game: {
       gravity: 0, lockDelay: 30, lockResets: 15,
       hold: true, holdShuffle: 30, ghost: true, showTarget: true, successDelay: 500, failDelay: 800,
+      effects: true, shake: true,
     },
     drill: { scenario: 'T', type: 'double', setup: 0 },
     // Last selection in each mode, restored when switching back to it.
@@ -76,6 +77,9 @@
       { path: 'game.successDelay', label: 'Pause after success', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'game.failDelay', label: 'Pause after miss', min: 0, max: 3000, step: 50, unit: 'ms' },
       { path: 'controls.deadzone', label: 'Gamepad stick deadzone', min: 0.1, max: 0.9, step: 0.05, unit: '' },
+      { heading: 'Visuals' },
+      { path: 'game.effects', label: 'Effects', hint: 'Drop trails, line clear flashes and particles', type: 'bool' },
+      { path: 'game.shake', label: 'Board shake', hint: 'On hard drops and when the piece bumps into a wall', type: 'bool' },
       { heading: 'Marathon' },
       { path: 'marathon.linesPerLevel', label: 'Lines per level', min: 1, max: 50, step: 1, unit: '' },
       { path: 'marathon.gStart', label: 'Gravity at level 1', hint: 'Cells per frame (0.0167 G = 1 row per second)', min: 0.005, max: 1, step: 0.005, unit: 'G' },

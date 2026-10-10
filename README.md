@@ -97,6 +97,7 @@ Under ⚙ Settings you can:
 - rebind the keyboard and gamepad
 - adjust handling timings
 - change game options
+- turn off the visual effects (drop trails, line clear flashes and particles) or the board shake
 - import and export your settings as JSON
 
 Settings are saved in the browser.
