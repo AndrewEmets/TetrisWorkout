@@ -52,8 +52,8 @@ select { padding: 4px 6px; }
 .bar label { color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .bar .spacer { flex: 1; }
 /* On wide screens the menu is just part of the toolbar; on phones it folds under the ☰ button. */
-.bar-menu, .sub-opts { display: contents; }
-.menu-btn, .bar-title, .bar-quick { display: none; }
+.bar-menu, .sub-opts, .menu-group { display: contents; }
+.menu-btn, .bar-title, .bar-quick, .menu-heading { display: none; }
 
 main {
   flex: 1;
@@ -142,7 +142,24 @@ main {
     border-bottom: 1px solid var(--border);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
   }
-  .bar.open .bar-menu { display: flex; }
+  .bar.open .bar-menu { display: flex; flex-direction: column; gap: 0; padding: 4px 12px 12px; }
+  /* Menu rows: the drill selects as a label / select grid, then rows of buttons, each group under a heading. */
+  .bar-menu .spacer { display: none; }
+  .menu-group { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; border-top: 1px solid var(--border); }
+  .menu-group:first-child { border-top: none; }
+  .menu-group:not(:has(> button:not(.hidden))):not(.menu-drill) { display: none; }
+  .menu-heading {
+    display: block; width: 100%; color: var(--muted); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .menu-drill { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+  .menu-drill .menu-heading { grid-column: 1 / -1; }
+  .menu-drill label, .menu-drill .sub-opts { display: contents; }
+  .menu-drill select { width: 100%; padding: 6px; }
+  .menu-buttons button { flex: 1; padding: 8px 10px; }
+  .menu-buttons button.star { flex: 0 0 auto; }
+  .menu-buttons button.star::after { content: ' Save'; font-size: 14px; }
+  .menu-buttons button.star.on::after { content: ' Saved'; }
   .bar.open .menu-btn { border-color: var(--accent); background: #3a2444; }
   main { position: relative; padding: 6px 8px; }
   #stage { align-items: flex-start; }

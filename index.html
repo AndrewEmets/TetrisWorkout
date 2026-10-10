@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
-  <link rel="stylesheet" href="style.css?v=57433a1e">
+  <link rel="stylesheet" href="style.css?v=ef8811b9">
 </head>
 <body>
   <header class="bar" id="bar">
@@ -23,18 +23,33 @@
       <button id="q-retry" title="Retry this board">↻</button>
       <button id="q-new" title="Next board">▶</button>
     </span>
+    <!-- On wide screens the groups are just part of the toolbar; on phones they are rows of the ☰ menu. -->
     <div id="bar-menu" class="bar-menu">
-      <label>Mode <select id="sel-mode"></select></label>
-      <span id="sub-opts" class="sub-opts"></span>
+      <div class="menu-group menu-drill">
+        <span class="menu-heading">Drill</span>
+        <label>Mode <select id="sel-mode"></select></label>
+        <span id="sub-opts" class="sub-opts"></span>
+      </div>
       <span class="spacer"></span>
-      <button id="btn-prev" title="Previous board (B)">◀ Prev</button>
-      <button id="btn-new" title="Next board — a new one, or forward again after going back (N)">Next ▶</button>
-      <button id="btn-retry" title="Retry this board">Retry</button>
-      <button id="btn-hint" title="Show / hide the solution">Hint</button>
-      <button id="btn-target" title="Show / hide the opener shape outline (T)">Outline</button>
-      <button id="btn-fav" class="star" title="Add this board to favorites (F)">☆</button>
-      <button id="btn-favs" title="Your favorite boards">Favorites</button>
-      <button id="btn-settings" title="Settings">⚙ Settings</button>
+      <div class="menu-group menu-buttons">
+        <span class="menu-heading">Board</span>
+        <button id="btn-prev" title="Previous board (B)">◀ Prev</button>
+        <button id="btn-retry" title="Retry this board">Retry</button>
+        <button id="btn-new" title="Next board — a new one, or forward again after going back (N)">Next ▶</button>
+      </div>
+      <div class="menu-group menu-buttons">
+        <span class="menu-heading">Help</span>
+        <button id="btn-hint" title="Show / hide the solution">Hint</button>
+        <button id="btn-target" title="Show / hide the opener shape outline (T)">Outline</button>
+      </div>
+      <div class="menu-group menu-buttons">
+        <span class="menu-heading">Favorites</span>
+        <button id="btn-fav" class="star" title="Add this board to favorites (F)">☆</button>
+        <button id="btn-favs" title="Your favorite boards">Favorites</button>
+      </div>
+      <div class="menu-group menu-buttons">
+        <button id="btn-settings" title="Settings">⚙ Settings</button>
+      </div>
     </div>
   </header>
 
