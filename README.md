@@ -26,17 +26,22 @@ options. Each mode remembers its last selection.
   **Setup pieces** (0–3) make you build the last pieces of the well yourself. Every setup piece is needed:
   the spin isn't possible before the last one is placed, or with any one of them kept in hold.
 - **Perfect clear:** 2-line or 4-line, with 2–8 pieces.
-- **PC openers** (under Perfect Clear, "2nd bag"): PCO and MKO. The first-bag shape is already built; finish the second-bag perfect clear.
-  **Setup pieces** (0–3) set how many pieces are yours to place: 0 means only the last piece, 3 the whole
-  perfect clear (the kept I or T plus three pieces). Any perfect clear counts, not just the one the solver found.
 - **Openers:** TKI, DT Cannon, Hachispin, PCO and MKO. Bag orders are 7-bag sequences checked to be buildable.
+  **Start** picks the stage: from the first bag, or from a later bag with the earlier ones already built (on a
+  random side), e.g. DT Cannon from bag 2 or just its T-Spin Triple, PCO / MKO from the second-bag perfect
+  clear. PCO and MKO can also start from the last 3, 2 or 1 pieces of the perfect clear; any perfect clear
+  counts, not just the one the solver found.
   The shape is outlined on the board while you build it (toggle with **Outline** or T).
   Only the key pieces (the spin well and its overhangs) have a fixed spot. In the last building step, filler
   pieces can go anywhere, as long as the spin still works (for TKI: fill the two rows the TSD clears). In earlier
   steps the next bag builds on the exact shape, so fillers have to fill it, in any arrangement and order.
-  After every piece a solver checks that the opener can still be finished, on either side; you only fail when
-  it can't. Every opener can also be built mirrored: queues are checked to work on both sides, and the
-  outline switches to the side you are building.
+  A piece off the shape doesn't fail the drill: you go on **off the shape** (the outline goes away), where
+  pieces can go anywhere and only the spins and the perfect clear count. A spin made before the rest of the
+  shape is placed counts too. After every piece a solver checks that the opener can still be finished, on
+  either side; off the shape it checks the next spin only, so you still get to make it when a later one is no
+  longer possible (DT Cannon: the TSD works, but the TST doesn't). You fail when the check proves a spin
+  impossible or a spin misses. Every opener can also be built mirrored: queues are checked to work on both
+  sides, and the outline switches to the side you are building.
 
 - **Marathon:** an endless 7-bag game for 150 or 300 lines, or endless, from a chosen start level. The level goes
   up every 10 lines and gravity grows by the same factor each level (a straight line on a log scale), from

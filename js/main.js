@@ -45,7 +45,7 @@
   const { SCENARIOS, MAX_SETUP } = TW.Generator;
   const MODES = [['spin', 'Spin'], ['opener', 'Opener'], ['pc', 'Perfect Clear'], ['marathon', 'Marathon']];
   const SPIN_PIECES = ['T', 'S', 'Z', 'L', 'J', 'I'];
-  const modeOf = (sc) => (sc === 'MA' ? 'marathon' : sc === 'OP' ? 'opener' : sc === 'PC' || sc === 'PO' ? 'pc' : 'spin');
+  const modeOf = (sc) => (sc === 'MA' ? 'marathon' : sc === 'OP' || sc === 'PO' ? 'opener' : sc === 'PC' ? 'pc' : 'spin');
   const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
   const selMode = document.getElementById('sel-mode');
   const subOpts = document.getElementById('sub-opts');
@@ -54,10 +54,12 @@
   // Makes the selection valid: known scenario, a type of that scenario, setup in range.
   function normalize(d) {
     if (d.scenario === 'MA') { d.type = 'marathon'; d.setup = 0; return d; }
+    // PC opener drills used to be under Perfect Clear (setup 3 = the whole second bag); now they are opener stages.
+    if (d.scenario === 'PO') { d.scenario = 'OP'; d.setup = 4 - (d.setup | 0); }
     if (!SCENARIOS[d.scenario]) { d.scenario = 'T'; d.type = 'double'; }
     const sc = SCENARIOS[d.scenario];
     if (!sc.types.some((t) => t[0] === d.type)) d.type = sc.types[0][0];
-    const max = d.scenario === 'PC' ? MAX_SETUP.pc : d.scenario === 'OP' ? 0 : d.scenario === 'PO' ? MAX_SETUP.po : MAX_SETUP.spin;
+    const max = d.scenario === 'PC' ? MAX_SETUP.pc : d.scenario === 'OP' ? TW.Openers.stages(d.type).length - 1 : MAX_SETUP.spin;
     d.setup = Math.min(Math.max(0, d.setup | 0), max);
     return d;
   }
@@ -74,15 +76,16 @@
       ];
     }
     if (mode === 'opener') {
-      return [{ label: 'Opener', options: SCENARIOS.OP.types, value: d.type, set: (v) => { d.type = v; } }];
+      const opts = [{ label: 'Opener', options: SCENARIOS.OP.types, value: d.type, set: (v) => { d.type = v; } }];
+      const stages = TW.Openers.stages(d.type);
+      if (stages.length > 1) opts.push({ label: 'Start', options: stages.map((s, i) => [i, s]), value: d.setup, set: (v) => { d.setup = +v; } });
+      return opts;
     }
     if (mode === 'pc') {
-      const kinds = SCENARIOS.PC.types.map((t) => ['PC:' + t[0], t[1]])
-        .concat(SCENARIOS.PO.types.map((t) => ['PO:' + t[0], t[1] + ' (2nd bag)']));
-      const opts = [{ label: 'Type', options: kinds, value: d.scenario + ':' + d.type, set: (v) => { [d.scenario, d.type] = v.split(':'); } }];
-      if (d.scenario === 'PC') opts.push(Object.assign(setupOpt(MAX_SETUP.pc, (i) => String(i + 2)), { label: 'Pieces' }));
-      else opts.push(setupOpt(MAX_SETUP.po));
-      return opts;
+      return [
+        { label: 'Type', options: SCENARIOS.PC.types.map((t) => [t[0], t[1]]), value: d.type, set: (v) => { d.type = v; } },
+        Object.assign(setupOpt(MAX_SETUP.pc, (i) => String(i + 2)), { label: 'Pieces' }),
+      ];
     }
     const m = settings.data.marathon;
     const opts = [
@@ -125,8 +128,8 @@
 
   function renderGuide() {
     const d = settings.data.drill;
-    let html = TW.Guides.forDrill(d.scenario, d.type);
-    const op = (d.scenario === 'OP' || d.scenario === 'PO') && TW.Openers.OPENERS[d.type];
+    let html = TW.Guides.forDrill(d.scenario, d.type, d.setup);
+    const op = d.scenario === 'OP' && TW.Openers.OPENERS[d.type];
     if (op) html += '<p class="muted">Shapes from <a href="' + op.source + '" target="_blank" rel="noopener">four.lol</a>.</p>';
     document.getElementById('guide-text').innerHTML = html;
   }
@@ -137,6 +140,12 @@
     settings.save();
     selMode.blur();
   });
+  // PC openers moved from Perfect Clear to Opener (as later starting stages).
+  const modes = settings.data.modes;
+  if (modes.pc && modes.pc.scenario === 'PO') {
+    modes.opener = normalize(Object.assign({}, modes.pc));
+    modes.pc = { scenario: 'PC', type: '4', setup: 2 };
+  }
   fillDrillSelectors();
 
   // Settings import/reset may change the drill selection.
@@ -250,7 +259,9 @@
   function updateInfo() {
     const d = game.drill;
     $('goal-text').textContent = d ? d.goal.text : '—';
-    $('bar-title').textContent = d ? d.goal.text + (d.setup ? ' · ' + (d.scenario === 'PC' ? d.queue.length + ' pieces' : d.setup + ' setup') : '') : '';
+    const setupText = !d || !d.setup ? '' : d.scenario === 'PC' ? d.queue.length + ' pieces'
+      : d.scenario === 'OP' ? TW.Openers.stages(d.type)[d.setup] || '' : d.setup + ' setup';
+    $('bar-title').textContent = d ? d.goal.text + (setupText ? ' · ' + setupText : '') : '';
     let detail = '';
     if (d) {
       const op = game.opener;
@@ -259,6 +270,7 @@
         const k = Math.min(game.op ? game.op.k : 0, op.phases.length - 1);
         detail = 'Step ' + (k + 1) + ' of ' + op.phases.length + ': ' + op.phases[k].label + '.';
         if (op.mirrored) detail += ' (Mirrored.)';
+        if (game.op && game.op.loose) detail += ' Off the shape: place pieces anywhere, as long as the ' + TW.Openers.finishersLeft(op, game.op, true) + ' still works.';
         if (k === 0 && game.ops && game.ops.length > 1) detail += ' Either side counts.';
       } else if (d.goal.kind === 'pc') detail = 'Clear the whole board using ' + d.queue.length + ' piece' + (d.queue.length > 1 ? 's' : '') + '. Stay under the dashed line.';
       else if (d.setup) detail = 'Place ' + d.setup + ' setup piece' + (d.setup > 1 ? 's' : '') + ' first, then spin the ' + d.goal.piece + '.';

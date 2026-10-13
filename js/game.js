@@ -215,10 +215,10 @@
       this.mara = null;
       if (this.marathon) { this.startMarathonRun(); return; }
       // Openers count on either side: one progress state per side that still fits, the drill's own side first.
+      // A drill that starts at a later bag is already built on its side.
       const d = this.drill;
-      this.ops = d.opener
-        ? [d.opener, TW.Openers.get(d.type, d.side === 'm' ? 'n' : 'm')].map((op) => ({ op, st: TW.Openers.settle(op, TW.Openers.initState(op, 0)) }))
-        : null;
+      const sides = d.opener && (d.start ? [d.opener] : [d.opener, TW.Openers.get(d.type, d.side === 'm' ? 'n' : 'm')]);
+      this.ops = sides ? sides.map((op) => ({ op, st: TW.Openers.settle(op, TW.Openers.initState(op, d.start || 0)) })) : null;
       this.hintCache = null;
       this.board = this.drill.board.clone();
       this.queue = this.drill.queue.slice();
@@ -235,10 +235,12 @@
     // Debug: play a custom board with the currently selected drill goal.
     loadCustom(board, queue) {
       const s = this.settings.data.drill;
-      const opener = s.scenario === 'OP' ? TW.Openers.get(s.type, 'n') : null;
-      const goal = opener ? { kind: 'opener', text: opener.name } : TW.Generator.makeGoal(s.scenario, s.type);
+      let opener = s.scenario === 'OP' ? TW.Openers.get(s.type, 'n') : null;
+      if (opener && s.setup >= opener.phases.length) opener = null; // the last pieces of a PC opener
+      const goal = opener ? { kind: 'opener', text: opener.name }
+        : s.scenario === 'OP' ? { kind: 'pc', height: 4, text: 'Perfect Clear' } : TW.Generator.makeGoal(s.scenario, s.type);
       this.genToken++;
-      this.setDrill({ board, queue, solution: [], goal, opener, scenario: s.scenario, type: s.type, setup: s.setup });
+      this.setDrill({ board, queue, solution: [], goal, opener, start: opener ? s.setup : 0, scenario: s.scenario, type: s.type, setup: s.setup });
     }
 
     success(name, sub) {
@@ -603,18 +605,31 @@
         live.push({ op: side.op, st });
       }
       if (!live.length) return this.fail(error);
-      // The side whose key pieces the player has placed is the one being built: show its outline.
-      this.ops = live.sort((a, b) => (b.st.keyHits || 0) - (a.st.keyHits || 0));
-      // Fail early when the remaining pieces can no longer finish the opener on any side (small search budget).
+      // Sides still on the shape come first, then the one whose key pieces the player has placed: it is the one
+      // being built, so its outline shows. Off the shape both sides are the same (only the finishers count).
+      live.sort((a, b) => (a.st.loose - b.st.loose) || (b.st.keyHits || 0) - (a.st.keyHits || 0));
+      this.ops = live[0].st.loose ? live.slice(0, 1) : live.filter((side) => !side.st.loose);
+      // Fail early when the remaining pieces can no longer finish the opener (small search budgets).
       let queue = this.queue.slice(), hold = this.hold, cur = null;
       if (queue.length) cur = queue.shift();
       else if (hold) { cur = hold; hold = null; }
       if (!cur) return this.fail('Out of pieces');
-      // Quick check with fillers on their suggested spots, then a small flexible search.
-      const solve = (side, strict, budget) => TW.Openers.solve(side.op,
-        { board: this.board, st: TW.Openers.copyState(side.st), cur, queue, hold, holdUsed: false }, { budget, strict, hold: this.g.hold }).ok;
-      const possible = live.some((side) => solve(side, true, 400)) || live.some((side) => solve(side, false, 150) !== false);
-      if (!possible) return this.fail('The rest of the queue can\'t finish ' + name0 + ' from here');
+      const solve = (side, st, strict, budget) => TW.Openers.solve(side.op,
+        { board: this.board, st: TW.Openers.copyState(st), cur, queue, hold, holdUsed: false }, { budget, strict, hold: this.g.hold }).ok;
+      const side = this.ops[0];
+      if (!side.st.loose) {
+        // On the shape: a quick check with fillers on their suggested spots, then a small flexible search.
+        if (this.ops.some((o) => solve(o, o.st, true, 400)) || this.ops.some((o) => solve(o, o.st, false, 150) !== false)) return this.spawnNext();
+        // The shape can't be finished anymore: go on off the shape while the finishers are still possible.
+        this.ops = [{ op: side.op, st: TW.Openers.toLoose(TW.Openers.copyState(side.st)) }];
+      }
+      // Off the shape only the next finisher is checked, so the player still gets to make it when a later one is no
+      // longer possible. The search rarely proves anything early: fail only when it does (or when a finisher misses).
+      const off = this.ops[0];
+      if (solve({ op: TW.Openers.untilNextFinisher(off.op, off.st.k) }, off.st, false, 150) === false) {
+        const next = TW.Openers.finishersLeft(off.op, off.st, true);
+        return this.fail(name ? name + ' ✓ — but the ' + next + ' isn\'t possible from here' : 'The rest of the queue can\'t make the ' + next + ' from here');
+      }
       this.spawnNext();
     }
 
@@ -673,13 +688,20 @@
       const key = this.locks + '|' + this.piece.type + '|' + this.hold + '|' + this.holdUsed;
       if (!this.hintCache || this.hintCache.key !== key) {
         const { op, st } = this.ops[0];
-        const solve = (strict, budget) => TW.Openers.solve(op, {
+        const solve = (strict, budget, o) => TW.Openers.solve(o || op, {
           board: this.board, st: TW.Openers.copyState(st), cur: this.piece.type, queue: this.queue.slice(), hold: this.hold, holdUsed: this.holdUsed,
         }, { budget, strict, hold: this.g.hold });
-        let res = solve(true, 400);
-        if (!res.ok) res = solve(false, 1500);
+        let res;
+        if (!st.loose) {
+          res = solve(true, 400);
+          if (!res.ok) res = solve(false, 1500);
+        } else {
+          // Off the shape: the whole opener if a quick search finds it, otherwise just the next finisher.
+          res = solve(false, 400);
+          if (!res.ok) res = solve(false, 400, TW.Openers.untilNextFinisher(op, st.k));
+        }
         const step = res.ok && res.actions.find((a) => !a.hold);
-        this.hintCache = { key, hint: step || { offScript: true } };
+        this.hintCache = { key, hint: step || { offScript: true, loose: st.loose } };
       }
       return this.hintCache.hint;
     }

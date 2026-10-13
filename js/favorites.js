@@ -19,6 +19,7 @@
       well: d.well || null,
       needsHold: !!d.needsHold,
       side: d.side || 'n',
+      start: d.start || 0,
     };
   }
 
@@ -32,7 +33,8 @@
       well: f.well || null,
       needsHold: !!f.needsHold,
       side: f.side || 'n',
-      opener: f.scenario === 'OP' ? TW.Openers.get(f.type, f.side) : null,
+      start: f.start || 0,
+      opener: f.goal.kind === 'opener' ? TW.Openers.get(f.type, f.side) : null,
     };
   }
 
@@ -70,9 +72,9 @@
 
   // ---------- Modal ----------
 
-  // Mini board preview. Opener favorites start empty, so they show the opener's first shape dimmed.
+  // Mini board preview. Opener favorites from the first bag start empty, so they show the opener's first shape dimmed.
   function drawThumb(canvas, f) {
-    const opener = f.scenario === 'OP' && TW.Openers.get(f.type, f.side);
+    const opener = f.goal.kind === 'opener' && !f.start && TW.Openers.get(f.type, f.side);
     const rows = (opener ? opener.phases[0].rows : f.rows).slice(-10);
     const c = 9, n = 10;
     const dpr = window.devicePixelRatio || 1;
@@ -141,7 +143,7 @@
         info.className = 'fav-info';
         const title = document.createElement('div');
         title.className = 'fav-title';
-        title.textContent = f.goal.text + (f.setup ? ' · ' + f.setup + ' setup' : '');
+        title.textContent = f.goal.text + (!f.setup ? '' : f.scenario === 'OP' ? ' · ' + (TW.Openers.stages(f.type)[f.setup] || '') : ' · ' + f.setup + ' setup');
         const sub = document.createElement('div');
         sub.className = 'muted';
         sub.textContent = 'Queue ' + f.queue.join('') + ' · saved ' + new Date(f.savedAt).toLocaleDateString();

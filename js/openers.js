@@ -19,6 +19,9 @@ TW.module(function (TW) {
   // In the last building phase (only the spin finisher follows) fillers can go anywhere: the player only has to
   // keep the spin possible, e.g. fill the rows a TSD clears. In earlier phases the next phase builds on the
   // exact shape, so fillers must cover the lowercase cells, in any arrangement.
+  // A piece off the shape doesn't fail the drill by itself: the opener goes on "off the shape", where only the
+  // spins (or the perfect clear) count, until the rest of the queue can't make them anymore (see toLoose).
+  // stage: the phase's name in the Start select (default "Bag n").
   const OPENERS = {
     tki: {
       name: 'TKI',
@@ -68,6 +71,7 @@ TW.module(function (TW) {
         },
         {
           label: 'Finish with the T-Spin Triple',
+          stage: 'T-Spin Triple',
           bag: ['T'],
           rows: [],
           finisher: TST,
@@ -177,14 +181,16 @@ TW.module(function (TW) {
   //   targets: key pieces (type -> { cells, key }); suggest: filler types -> suggested cells;
   //   free: fillers may go anywhere (last building phase with a spin finisher), otherwise they must fill `zone`;
   //   top: highest row fillers may use; slot: the finisher's cells, which must stay empty;
-  //   need: cells the finisher's line clear needs filled (used to prune the solver).
+  //   need: cells the finisher's line clear needs filled (used to prune the solver);
+  //   cells: all the shape's cells (off the shape, placements there are tried first);
+  //   looseTop: highest row a piece may use off the shape; pcH: height of a perfect clear right after this phase.
   const shapeCache = new WeakMap();
   function phaseShape(op, k) {
     if (!shapeCache.has(op)) shapeCache.set(op, []);
     const cache = shapeCache.get(op);
     if (cache[k]) return cache[k];
     const ph = op.phases[k];
-    const targets = new Map(), suggest = new Map(), zone = new Set(), slot = new Set(), need = new Set();
+    const targets = new Map(), suggest = new Map(), zone = new Set(), slot = new Set(), need = new Set(), cells = new Set();
     let free = false, top = 0;
     if (ph && ph.rows.length) {
       top = H - ph.rows.length;
@@ -194,6 +200,7 @@ TW.module(function (TW) {
           const ch = row[x], up = ch.toUpperCase(), y = top + i;
           if (ch !== '.') full.set(x, y, 1);
           if (!TYPES.includes(up)) continue;
+          cells.add(y * W + x);
           const map = ch === up ? targets : suggest;
           if (!map.has(up)) map.set(up, []);
           map.get(up).push([x, y]);
@@ -218,8 +225,12 @@ TW.module(function (TW) {
         top = Math.max(0, top - 2); // a little room above the shape
       }
     }
-    for (const [t, cells] of targets) targets.set(t, { cells, key: cellKey(cells) });
-    return (cache[k] = { targets, suggest, zone, free, top, slot, need });
+    for (const [t, c] of targets) targets.set(t, { cells: c, key: cellKey(c) });
+    const next = op.phases.slice(k + 1).find((p) => p.rows.length || p.finisher);
+    const pcH = ph && !ph.finisher && next && !next.rows.length && next.finisher.pc || 0;
+    const ref = op.phases.slice(0, k + 1).reverse().find((p) => p.rows.length); // a phase without rows: the last shape
+    const looseTop = pcH ? H - pcH : H - (ref ? ref.rows.length : 4) - 2;
+    return (cache[k] = { targets, suggest, zone, free, top, slot, need, cells, looseTop, pcH });
   }
 
   function finisherText(f) { return f ? f.text : ''; }
@@ -262,13 +273,23 @@ TW.module(function (TW) {
 
   // Progress through an opener: phase k, key pieces still to place, filler types still to place, the phase's
   // shape (see phaseShape), and the lines left for a perfect clear finisher.
-  function initState(op, k) {
+  function initState(op, k, loose) {
     const ph = op.phases[k];
     const shape = phaseShape(op, k);
-    return {
+    const st = {
       k, shape, targets: new Map(shape.targets), fillers: new Set(shape.suggest.keys()), suggest: shape.suggest,
-      pcLeft: ph && ph.finisher && ph.finisher.pc ? ph.finisher.pc : 0,
+      pcLeft: ph && ph.finisher && ph.finisher.pc ? ph.finisher.pc : 0, loose: false,
     };
+    return loose ? toLoose(st) : st;
+  }
+
+  // Off the shape: the phase's remaining pieces can go anywhere (below looseTop, without clearing lines), and so
+  // can the later phases' pieces. Only the finishers (spins, perfect clear) still have to work.
+  function toLoose(st) {
+    st.loose = true;
+    for (const t of st.targets.keys()) st.fillers.add(t);
+    st.targets = new Map();
+    return st;
   }
 
   function copyState(st) {
@@ -279,6 +300,7 @@ TW.module(function (TW) {
   // Why a filler can't go there, or null.
   function fillerError(op, st, type, cells) {
     const sh = st.shape;
+    if (st.loose) return cells.some((c) => c[1] < sh.looseTop) ? 'That ' + type + ' is too high for ' + op.name : null;
     if (!sh.free) return cells.every(([x, y]) => sh.zone.has(y * W + x)) ? null : 'That ' + type + ' is outside the ' + op.name + ' shape';
     if (cells.some(([x, y]) => sh.slot.has(y * W + x))) return 'That ' + type + ' fills the ' + op.phases[st.k].finisher.text + ' slot';
     if (cells.some((c) => c[1] < sh.top)) return 'That ' + type + ' is too high for ' + op.name;
@@ -288,7 +310,7 @@ TW.module(function (TW) {
   // Can the remaining fillers still fill the cells the finisher's line clear needs?
   function needsCoverable(st, board) {
     const sh = st.shape;
-    if (!sh.need.size) return true;
+    if (!sh.need.size || st.loose) return true;
     const keyCells = new Set();
     for (const t of st.targets.values()) for (const [x, y] of t.cells) keyCells.add(y * W + x);
     let open = 0;
@@ -299,21 +321,34 @@ TW.module(function (TW) {
   // Advances past phases that are already complete (structure placed and no finisher).
   function settle(op, st) {
     while (st.k < op.phases.length && !building(st) && !op.phases[st.k].finisher) {
-      Object.assign(st, initState(op, st.k + 1));
+      Object.assign(st, initState(op, st.k + 1, st.loose));
     }
     return st;
   }
 
-  // Applies a lock to opener progress. Returns { error } | { done } | {} and mutates st.
+  // Is this the phase's spin finisher, made before the shape is done?
+  function earlyFinisher(ph, st, type) {
+    const f = ph.finisher;
+    return !!f && !f.pc && f.piece === type && !st.targets.has(type) && !st.fillers.has(type);
+  }
+
+  // Applies a lock to opener progress. Returns { error } | { done } | {} and mutates st. A piece off the shape
+  // switches to off-the-shape progress (st.loose) instead of an error.
   function applyLock(op, st, board, type, cells, spin, lines) {
     const ph = op.phases[st.k];
-    if (building(st)) {
+    if (building(st) && earlyFinisher(ph, st, type)) {
+      if (!TW.Generator.goalMatches({ kind: 'spin', ...ph.finisher }, type, spin, lines)) return { error: 'Keep the ' + type + ' for the ' + ph.finisher.text };
+      // The spin before the shape is done: the phase's other pieces carry over to the next phase, off the shape.
+      const left = [...st.targets.keys(), ...st.fillers];
+      Object.assign(st, initState(op, st.k + 1, true));
+      for (const t of left) st.fillers.add(t);
+    } else if (building(st)) {
       const t = st.targets.get(type);
-      if (t) {
-        if (t.key !== cellKey(cells)) return { error: 'That ' + type + ' is not where the ' + op.name + ' shape needs it' };
+      if (t && t.key === cellKey(cells)) {
         st.targets.delete(type);
         st.keyHits = (st.keyHits || 0) + 1;
-      } else if (st.fillers.has(type)) {
+      } else if (t || st.fillers.has(type)) {
+        if (t || fillerError(op, st, type, cells)) toLoose(st);
         const err = fillerError(op, st, type, cells);
         if (err) return { error: err };
         st.fillers.delete(type);
@@ -327,13 +362,13 @@ TW.module(function (TW) {
         if (board.stackHeight() > st.pcLeft) return { error: 'Stack went above the perfect clear line' };
         return {};
       }
-      Object.assign(st, initState(op, st.k + 1));
+      Object.assign(st, initState(op, st.k + 1, st.loose));
     } else if (ph.finisher) {
       if (!TW.Generator.goalMatches({ kind: 'spin', ...ph.finisher }, type, spin, lines)) {
         const got = TW.Spin.describe(type, spin, lines);
         return { error: (got ? got + ' — ' : '') + 'needed ' + ph.finisher.text };
       }
-      Object.assign(st, initState(op, st.k + 1));
+      Object.assign(st, initState(op, st.k + 1, st.loose));
     }
     settle(op, st);
     return st.k >= op.phases.length ? { done: true } : {};
@@ -388,6 +423,25 @@ TW.module(function (TW) {
     function options(n) {
       const ph = op.phases[n.st.k];
       const res = search(n.board, n.cur);
+      if (building(n.st) && earlyFinisher(ph, n.st, n.cur)) {
+        if (strict) return [];
+        const pl = res.placements.find((p) => TW.Generator.goalMatches({ kind: 'spin', ...ph.finisher }, p.type, p.spin, p.lines));
+        return pl ? [{ pl, res }] : [];
+      }
+      if (building(n.st) && n.st.loose) {
+        if (!n.st.fillers.has(n.cur)) return [];
+        const sh = n.st.shape;
+        const out = distinct(res, (pl, cells) => {
+          if (pl.lines || fillerError(op, n.st, pl.type, cells)) return false;
+          if (!sh.pcH) return true;
+          const b = n.board.clone();
+          b.place(pl);
+          return pcPrune(b, sh.pcH);
+        });
+        // Placements on the shape's cells first, then low ones.
+        const score = (o) => cellsOf(o.pl).reduce((s, [x, y]) => s + (sh.cells.has(y * W + x) ? 100 : 0) + y, 0);
+        return random ? out : out.sort((a, b) => score(b) - score(a));
+      }
       if (building(n.st)) {
         const t = n.st.targets.get(n.cur);
         if (t) {
@@ -427,7 +481,7 @@ TW.module(function (TW) {
       if (n.st.k >= op.phases.length) return [];
       if (!n.cur) return null;
       if (++nodes > budget) throw BUDGET;
-      const key = n.st.k + '|' + [...n.st.targets.keys()].join('') + '/' + [...n.st.fillers].join('') + '|' + n.st.pcLeft +
+      const key = n.st.k + (n.st.loose ? 'L' : '') + '|' + [...n.st.targets.keys()].join('') + '/' + [...n.st.fillers].join('') + '|' + n.st.pcLeft +
         '|' + n.cur + n.hold + (n.holdUsed ? 1 : 0) + '|' + n.queue.join('') + '|' + boardKey(n.board);
       if (failed.has(key)) return null;
       if (building(n.st) && !needsCoverable(n.st, n.board)) { failed.add(key); return null; }
@@ -439,7 +493,7 @@ TW.module(function (TW) {
         const st = copyState(n.st);
         const r = applyLock(op, st, board, pl.type, cells, pl.spin, lines);
         if (r.error) continue;
-        const step = { type: pl.type, rot: pl.rot, x: pl.x, y: pl.y, path: res.pathTo(pl) };
+        const step = { type: pl.type, rot: pl.rot, x: pl.x, y: pl.y, path: res.pathTo(pl), phase: n.st.k };
         if (r.done) return [step];
         const rest = dfs(next(n, board, st, n.hold));
         if (rest) return [step, ...rest];
@@ -466,14 +520,86 @@ TW.module(function (TW) {
     }
   }
 
+  // Where an opener drill can start (the `setup` key of opener drills): each phase, with the earlier ones already
+  // built, then for PC openers the last 3 / 2 / 1 pieces of the perfect clear.
+  function stages(id) {
+    const op = OPENERS[id];
+    if (!op) return [];
+    const out = op.phases.map((ph, k) => ph.stage || 'Bag ' + (k + 1));
+    if (PC_OPENERS.includes(id)) out.push('Last 3 pieces', 'Last 2 pieces', 'Last piece');
+    return out;
+  }
+
+  // Replays a solution from the empty board up to phase k: the board then and the pieces still to come (a held
+  // piece first, so it is the first one to play or hold).
+  function replayTo(queue, actions, k) {
+    const board = new TW.Board();
+    let i = 0, cur = queue[i++], hold = null;
+    for (const a of actions) {
+      if (!a.hold && a.phase >= k) break;
+      if (a.hold) {
+        if (hold) [cur, hold] = [hold, cur];
+        else { hold = cur; cur = queue[i++]; }
+        continue;
+      }
+      board.place(a);
+      board.clearLines();
+      if (i < queue.length) cur = queue[i++];
+      else { cur = hold; hold = null; }
+    }
+    return { board, queue: [hold, cur].filter(Boolean).concat(queue.slice(i)) };
+  }
+
+  // The finishers still to make, as text: "T-Spin Double, then T-Spin Triple" (only the next one with `next`).
+  function finishersLeft(op, st, next) {
+    const texts = op.phases.slice(st.k).filter((ph) => ph.finisher).map((ph) => ph.finisher.text);
+    return next ? texts[0] || '' : texts.join(', then ');
+  }
+
+  // The opener up to its next finisher from phase k. Off the shape, the next spin is checked on its own: the
+  // player gets to make it even when a later one is no longer possible.
+  const truncated = new WeakMap();
+  function untilNextFinisher(op, k) {
+    let j = op.phases.findIndex((ph, i) => i >= k && ph.finisher);
+    if (j < 0 || j === op.phases.length - 1) return op;
+    if (!truncated.has(op)) truncated.set(op, []);
+    const cache = truncated.get(op);
+    return cache[j] || (cache[j] = Object.assign({}, op, { phases: op.phases.slice(0, j + 1) }));
+  }
+
   // Returns a drill with a 7-bag queue that can build the opener on both sides, or null. Without hold such
   // queues are rare, so a queue that works on the normal side only is the fallback.
   // The recorded solution (hints, walkthrough) is for the normal side.
-  function generate(id, allowHold) {
+  // stage > 0 (see stages): the earlier phases are already built, on a random side.
+  function generate(id, allowHold, stage) {
     const op = get(id, 'n');
     if (!op) return null;
+    stage = stage | 0;
     const build = (o, queue) => solve(o, { board: new TW.Board(), st: settle(o, initState(o, 0)), cur: queue[0], queue: queue.slice(1), hold: null, holdUsed: false },
       { budget: 6000, hold: allowHold, strict: true });
+    if (stage >= op.phases.length) {
+      const d = genPCOpener(id, op.phases.length + 2 - stage, Math.random() < 0.5 ? 'n' : 'm');
+      return d && Object.assign(d, { scenario: 'OP', type: id, setup: stage });
+    }
+    if (stage > 0) {
+      const side = Math.random() < 0.5 ? 'n' : 'm';
+      const o = get(id, side);
+      for (let attempt = 0; attempt < 300; attempt++) {
+        const queue = [].concat(...o.phases.map((ph) => shuffle(ph.bag.slice())));
+        const r = build(o, queue);
+        if (!r.ok) continue;
+        const at = replayTo(queue, r.actions, stage);
+        const st = settle(o, initState(o, stage));
+        const r2 = solve(o, { board: at.board, st, cur: at.queue[0], queue: at.queue.slice(1), hold: null, holdUsed: false },
+          { budget: 6000, hold: allowHold, strict: true });
+        if (!r2.ok) continue;
+        return {
+          board: at.board, queue: at.queue, solution: r2.actions, goal: { kind: 'opener', text: o.name }, opener: o, side,
+          start: stage, scenario: 'OP', type: id, setup: stage, attempts: attempt + 1,
+        };
+      }
+      return null;
+    }
     const drill = (queue, r, attempts) => ({
       board: new TW.Board(), queue, solution: r.actions, goal: { kind: 'opener', text: op.name }, opener: op, side: 'n',
       scenario: 'OP', type: id, setup: 0, attempts,
@@ -535,12 +661,9 @@ TW.module(function (TW) {
     return null;
   }
 
-  TW.Generator.SCENARIOS.PO = { label: 'PC Opener', types: PC_OPENERS.map((id) => [id, OPENERS[id].name]) };
   TW.Generator.SCENARIOS.OP = { label: 'Opener', types: Object.entries(OPENERS).map(([id, o]) => [id, o.name]) };
-  TW.Generator.MAX_SETUP.op = 0;
-  TW.Generator.MAX_SETUP.po = 3;
 
   TW.Openers = {
-    OPENERS, get, initState, copyState, settle, applyLock, solve, generate, genPCOpener, cellKey, finisherText,
+    OPENERS, get, initState, copyState, settle, toLoose, applyLock, solve, generate, genPCOpener, stages, finishersLeft, untilNextFinisher, cellKey, finisherText,
   };
 });

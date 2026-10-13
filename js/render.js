@@ -371,7 +371,7 @@
       // Opener: remaining cells of the current phase's shape. Key pieces are brighter than the suggested
       // filler spots (fillers may go anywhere in the shape).
       const op = game.op;
-      if (op && game.g.showTarget && game.phase === 'play') {
+      if (op && !op.loose && game.g.showTarget && game.phase === 'play') {
         for (const [t, tg] of op.targets) {
           for (const [x, y] of tg.cells) if (!b.get(x, y)) this.fieldCell(x, y, COLORS[t], 0.18);
         }
@@ -384,7 +384,7 @@
       const hint = game.hint();
       let badge = null;
       if (hint && hint.offScript) {
-        this.text('Off script — press Retry', fx + W * c / 2, fy + c, c * 0.6, '#ffd75a', 'center');
+        this.text(hint.loose ? 'No hint found off the shape' : 'Off script — press Retry', fx + W * c / 2, fy + c, c * 0.6, '#ffd75a', 'center');
       } else if (hint) {
         // Spins and tucks: the spot to rotate from, with the rotation to do; the final spot fainter.
         const setup = game.hintSetup(hint);

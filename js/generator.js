@@ -34,7 +34,6 @@ TW.module(function (TW) {
     const sc = SCENARIOS[scenario];
     const t = sc.types.find((x) => x[0] === type) || sc.types[0];
     if (scenario === 'PC') return { kind: 'pc', height: t[2], text: 'Perfect Clear (' + t[1] + ')' };
-    if (scenario === 'PO') return { kind: 'pc', height: 4, text: 'Perfect Clear (' + t[1] + ')' };
     const spin = scenario === 'T' ? (t[0] === 'mini' ? 'mini' : 'full') : 'any';
     const text = (spin === 'mini' ? 'Mini ' : '') + sc.piece + '-Spin ' + TW.Spin.LINE_NAMES[t[2]].toLowerCase().replace(/^./, (c) => c.toUpperCase());
     return { kind: 'spin', piece: sc.piece, spin, lines: t[2], text };
@@ -521,14 +520,10 @@ TW.module(function (TW) {
   // opts: hold (hold allowed), shuffle (chance in % of a queue order that needs hold).
   function generate(scenario, type, setup, opts) {
     opts = opts || {};
-    if (scenario === 'OP') return TW.Openers.generate(type, opts.hold !== false);
-    const side = Math.random() < 0.5 ? 'n' : 'm'; // PC openers: the first bag is built on a random side
-    let goal = makeGoal(scenario, type);
+    if (scenario === 'OP') return TW.Openers.generate(type, opts.hold !== false, setup);
+    const goal = makeGoal(scenario, type);
     let drill;
-    if (scenario === 'PO') {
-      drill = TW.Openers.genPCOpener(type, Math.min(setup, MAX_SETUP.po), side);
-      if (drill) goal = drill.goal;
-    } else if (goal.kind === 'pc') {
+    if (goal.kind === 'pc') {
       const n = Math.min(setup, MAX_SETUP.pc);
       drill = genPC(goal, 2 + n);
     } else {

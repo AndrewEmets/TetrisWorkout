@@ -9,7 +9,7 @@
     let cur = queue.shift();
     let hold = null;
     const op = drill.opener;
-    const st = op ? TW.Openers.settle(op, TW.Openers.initState(op, 0)) : null;
+    const st = op ? TW.Openers.settle(op, TW.Openers.initState(op, drill.start || 0)) : null;
     const placements = drill.solution.filter((a) => !a.hold).length;
     let placed = 0;
     for (const step of drill.solution) {
@@ -79,7 +79,7 @@
     for (const [sc, def] of Object.entries(TW.Generator.SCENARIOS)) {
       if (opts.only && !opts.only.includes(sc)) continue;
       for (const [type] of def.types) {
-        for (const setup of sc === 'OP' ? [0] : setups) {
+        for (const setup of sc === 'OP' ? TW.Openers.stages(type).map((_, i) => i) : setups) {
           let ok = 0, fail = 0, gen = 0, ms = 0, tpl = 0, held = 0;
           const errors = [];
           for (let i = 0; i < n; i++) {

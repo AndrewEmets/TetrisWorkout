@@ -81,17 +81,17 @@
       </ul>`,
   };
 
-  // PC Opener drills: the first bag is already built; finish the second-bag perfect clear.
+  // PC openers from the second bag: the first bag is already built; finish the perfect clear.
   const PC_OPENER = {
     pco: `
       <p>The <b>PCO</b> shape from the first bag is already built, and the <b>I</b> was kept. The second-bag
-      perfect clear fills the 4-row hole in the middle. Setup N means the last N + 1 pieces of the
-      perfect clear are yours to place.</p>
+      perfect clear fills the 4-row hole in the middle. The <b>Last N pieces</b> starts have the rest of
+      it already placed.</p>
       <p>The usual solutions put the I <b>vertically</b>, flat in the <b>1st row</b>, or flat in the <b>3rd row</b>.
       The cell under the Z overhang has to be filled with a tuck or a spin.</p>`,
     mko: `
       <p>The <b>MKO</b> shape from the first bag is already built, and the <b>T</b> was kept. Finish the perfect
-      clear with the T and the second bag. Setup N means the last N + 1 pieces are yours to place.</p>`,
+      clear with the T and the second bag. The <b>Last N pieces</b> starts have the rest of it already placed.</p>`,
   };
 
   const MARATHON = `
@@ -106,10 +106,9 @@
     +50 per step, perfect clears +800 – 2000. Soft drop scores 1 per row, hard drop 2.</p>
     <p>The game pauses while Settings, Favorites, the phone menu or the ℹ panels are open.</p>`;
 
-  function forDrill(scenario, type) {
+  function forDrill(scenario, type, setup) {
     if (scenario === 'MA') return MARATHON;
-    if (scenario === 'OP') return OPENERS[type] || '';
-    if (scenario === 'PO') return (PC_OPENER[type] || '') + SCENARIOS.PC;
+    if (scenario === 'OP') return setup && PC_OPENER[type] ? PC_OPENER[type] + SCENARIOS.PC : OPENERS[type] || '';
     return SCENARIOS[scenario] || '';
   }
 

@@ -23,7 +23,7 @@
   function revive(d) {
     if (!d) return null;
     d.board = new TW.Board(Uint8Array.from(d.board));
-    if (d.scenario === 'OP') d.opener = TW.Openers.get(d.type, d.side);
+    if (d.goal.kind === 'opener') d.opener = TW.Openers.get(d.type, d.side);
     return d;
   }
 
